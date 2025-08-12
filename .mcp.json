@@ -1,16 +1,18 @@
 {
   "mcpServers": {
     "sequential-thinking": {
-      "command": "bun x",
+      "command": "bun",
       "args": [
+        "x",
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ]
     },
     "context7": {
       "type": "stdio",
-      "command": "bun x",
+      "command": "bun",
       "args": [
+        "x",
         "-y",
         "@upstash/context7-mcp"
       ],
@@ -29,6 +31,16 @@
         "False",
         "--project",
         "%cd%"
+      ],
+      "env": {}
+    },
+    "rust-lsp": {
+      "type": "stdio",
+      "command": "bun",
+      "args": [
+        "x",
+        "@mizchi/lsmcp",
+        "--bin=rust-analyzer"
       ],
       "env": {}
     }

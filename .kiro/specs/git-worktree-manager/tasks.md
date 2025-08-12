@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. プロジェクト基盤の構築
+- [x] 1. プロジェクト基盤の構築
   - Cargo.tomlの作成とクレート依存関係の設定（clap, ratatui, serde, toml, notify等）
   - 基本的なプロジェクト構造とモジュール定義の実装
   - _Requirements: 1.1, 4.4, 5.1, 6.1_
