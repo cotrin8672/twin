@@ -6,7 +6,7 @@
   - _Requirements: 1.1, 4.4, 5.1, 6.1_
 
 - [ ] 2. コア型定義とエラーハンドリング
-  - [ ] 2.1 基本データ型とエラー型の定義
+  - [x] 2.1 基本データ型とエラー型の定義
     - AgentEnvironment、Config、SymlinkInfo等の構造体を定義
     - 包括的なカスタムエラー型（GitError, SymlinkError, ConfigError等）を実装
     - 部分的失敗時の状態管理用の型を追加
