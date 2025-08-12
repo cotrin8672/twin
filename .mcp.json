@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "sequential-thinking": {
-      "command": "npx",
+      "command": "bun x",
       "args": [
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
@@ -9,7 +9,7 @@
     },
     "context7": {
       "type": "stdio",
-      "command": "npx",
+      "command": "bun x",
       "args": [
         "-y",
         "@upstash/context7-mcp"
