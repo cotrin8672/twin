@@ -248,3 +248,132 @@ impl TwinError {
         !matches!(self, Self::Hook { .. } | Self::Lock { .. })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+
+    #[test]
+    fn test_twin_error_git() {
+        let error = TwinError::git("Failed to checkout branch");
+        match &error {
+            TwinError::Git { message, source } => {
+                assert_eq!(message, "Failed to checkout branch");
+                assert!(source.is_none());
+            }
+            _ => panic!("Expected Git error"),
+        }
+        
+        // Display実装のテスト
+        let display_str = format!("{}", error);
+        assert!(display_str.contains("Git error"));
+        assert!(display_str.contains("Failed to checkout branch"));
+    }
+
+    #[test]
+    fn test_twin_error_symlink() {
+        let path = PathBuf::from("/tmp/test.txt");
+        let error = TwinError::symlink("Failed to create symlink", Some(path.clone()));
+        
+        match error {
+            TwinError::Symlink { message, path: p, source } => {
+                assert_eq!(message, "Failed to create symlink");
+                assert_eq!(p, Some(path));
+                assert!(source.is_none());
+            }
+            _ => panic!("Expected Symlink error"),
+        }
+    }
+
+    #[test]
+    fn test_twin_error_config() {
+        let path = PathBuf::from("config.toml");
+        let error = TwinError::Config {
+            message: "Invalid TOML".to_string(),
+            path: Some(path.clone()),
+            source: None,
+        };
+        
+        match &error {
+            TwinError::Config { message, path: p, source } => {
+                assert_eq!(message, "Invalid TOML");
+                assert_eq!(p, &Some(path));
+                assert!(source.is_none());
+            }
+            _ => panic!("Expected Config error"),
+        }
+        
+        // Display実装のテスト
+        let display_str = format!("{}", error);
+        assert!(display_str.contains("Config error"));
+        assert!(display_str.contains("Invalid TOML"));
+    }
+
+    #[test]
+    fn test_twin_error_display() {
+        let errors = vec![
+            (TwinError::git("git error"), "Git error: git error"),
+            (
+                TwinError::symlink("symlink error", None),
+                "Symlink error: symlink error",
+            ),
+            (
+                TwinError::Environment {
+                    message: "env error".to_string(),
+                    agent_name: Some("agent1".to_string()),
+                },
+                "Environment error: env error",
+            ),
+            (
+                TwinError::Hook {
+                    message: "hook failed".to_string(),
+                    hook_type: "pre_create".to_string(),
+                    exit_code: Some(1),
+                },
+                "Hook execution failed: hook failed",
+            ),
+            (
+                TwinError::AlreadyExists {
+                    resource: "Environment".to_string(),
+                    name: "test".to_string(),
+                },
+                "Environment already exists: test",
+            ),
+            (
+                TwinError::NotFound {
+                    resource: "Branch".to_string(),
+                    name: "feature".to_string(),
+                },
+                "Branch not found: feature",
+            ),
+            (
+                TwinError::InvalidArgument {
+                    message: "invalid arg".to_string(),
+                },
+                "Invalid argument: invalid arg",
+            ),
+            (TwinError::Other("other error".to_string()), "other error"),
+        ];
+        
+        for (error, expected) in errors {
+            let display_str = format!("{}", error);
+            assert_eq!(display_str, expected);
+        }
+    }
+
+    #[test]
+    fn test_twin_error_from_io() {
+        let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
+        let twin_error = TwinError::from(io_error);
+        
+        match twin_error {
+            TwinError::Io { message, path, source } => {
+                assert!(message.contains("IO error"));
+                assert!(path.is_none());
+                assert!(source.is_some());
+            }
+            _ => panic!("Expected Io error"),
+        }
+    }
+}

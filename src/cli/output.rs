@@ -194,4 +194,112 @@ mod tests {
             "Error: test"
         );
     }
+
+    #[test]
+    fn test_output_format_from_str_case_insensitive() {
+        assert!(matches!(
+            OutputFormat::from_str("TABLE"),
+            Ok(OutputFormat::Table)
+        ));
+        assert!(matches!(
+            OutputFormat::from_str("Json"),
+            Ok(OutputFormat::Json)
+        ));
+        assert!(matches!(
+            OutputFormat::from_str("SIMPLE"),
+            Ok(OutputFormat::Simple)
+        ));
+    }
+
+    #[test]
+    fn test_format_table_empty() {
+        let environments: Vec<&AgentEnvironment> = vec![];
+        let result = format_table(&environments, None);
+        
+        assert!(result.is_ok());
+        // 空の時は "No environments found." が出力される
+    }
+
+    #[test]
+    fn test_format_json_empty() {
+        let environments: Vec<&AgentEnvironment> = vec![];
+        let result = format_json(&environments);
+        
+        assert!(result.is_ok());
+        // JSON形式では空配列 [] が出力される
+    }
+
+    #[test]
+    fn test_format_simple_empty() {
+        let environments: Vec<&AgentEnvironment> = vec![];
+        let result = format_simple(&environments, None);
+        
+        assert!(result.is_ok());
+        // シンプル形式では何も出力されない
+    }
+
+    #[test]
+    fn test_format_datetime_formatting() {
+        use chrono::{TimeZone, Utc};
+        
+        // 2024年1月15日 14:30:00 UTC
+        let dt = Utc.with_ymd_and_hms(2024, 1, 15, 14, 30, 0).unwrap();
+        let formatted = format_datetime(&dt);
+        
+        // フォーマットは "MM/DD HH:MM" 形式
+        // ローカルタイムゾーンに依存するため、形式のみチェック
+        assert!(formatted.contains("/"));
+        assert!(formatted.contains(":"));
+        assert!(formatted.len() >= 11); // "01/15 14:30" の最小長
+    }
+
+    #[test]
+    fn test_output_formatter_new() {
+        let formatter = OutputFormatter::new("table");
+        // OutputFormatterがTableフォーマットで作成される
+        
+        let formatter_invalid = OutputFormatter::new("invalid");
+        // 無効な形式の場合はデフォルト（Table）にフォールバック
+    }
+
+    #[test]
+    fn test_format_environments_with_data() {
+        use chrono::Utc;
+        
+        let env1 = AgentEnvironment {
+            name: "test1".to_string(),
+            branch: "feature/test1".to_string(),
+            worktree_path: PathBuf::from("/tmp/test1"),
+            symlinks: vec![],
+            status: EnvironmentStatus::Active,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            config_path: None,
+        };
+        
+        let env2 = AgentEnvironment {
+            name: "test2".to_string(),
+            branch: "feature/test2".to_string(),
+            worktree_path: PathBuf::from("/tmp/test2"),
+            symlinks: vec![],
+            status: EnvironmentStatus::Inactive,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            config_path: None,
+        };
+        
+        let environments = vec![&env1, &env2];
+        
+        // Table形式
+        let result_table = format_table(&environments, Some("test1"));
+        assert!(result_table.is_ok());
+        
+        // JSON形式
+        let result_json = format_json(&environments);
+        assert!(result_json.is_ok());
+        
+        // Simple形式
+        let result_simple = format_simple(&environments, Some("test1"));
+        assert!(result_simple.is_ok());
+    }
 }

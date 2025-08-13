@@ -397,3 +397,291 @@ impl EnvironmentRegistry {
         self.active.as_ref().and_then(|name| self.get(name))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use tempfile::NamedTempFile;
+    use std::io::Write;
+
+    // Config関連のテスト
+    #[test]
+    fn test_config_new() {
+        let config = Config::new();
+        assert!(config.path.is_none());
+        assert!(config.global_path.is_none());
+        assert_eq!(config.settings.files.len(), 0);
+        assert_eq!(config.settings.hooks.pre_create.len(), 0);
+        assert_eq!(config.settings.hooks.post_create.len(), 0);
+        assert_eq!(config.settings.hooks.pre_remove.len(), 0);
+        assert_eq!(config.settings.hooks.post_remove.len(), 0);
+        assert_eq!(config.settings.branch_prefix, Some("agent".to_string()));
+    }
+
+    #[test]
+    fn test_config_from_valid_toml() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let toml_content = r#"
+            branch_prefix = "feature"
+            
+            [[files]]
+            path = ".env"
+            mapping_type = "copy"
+            description = "Environment variables"
+            skip_if_exists = true
+            
+            [[hooks.pre_create]]
+            command = "echo 'Creating environment'"
+            continue_on_error = false
+            timeout = 30
+        "#;
+        
+        temp_file.write_all(toml_content.as_bytes()).unwrap();
+        
+        let config = Config::from_path(temp_file.path()).unwrap();
+        assert_eq!(config.settings.branch_prefix, Some("feature".to_string()));
+        assert_eq!(config.settings.files.len(), 1);
+        assert_eq!(config.settings.files[0].path, PathBuf::from(".env"));
+        assert_eq!(config.settings.files[0].mapping_type, MappingType::Copy);
+        assert_eq!(config.settings.files[0].description, Some("Environment variables".to_string()));
+        assert!(config.settings.files[0].skip_if_exists);
+        assert_eq!(config.settings.hooks.pre_create.len(), 1);
+        assert_eq!(config.settings.hooks.pre_create[0].command, "echo 'Creating environment'");
+        assert_eq!(config.settings.hooks.pre_create[0].timeout, 30);
+    }
+
+    #[test]
+    fn test_config_from_invalid_toml() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(b"invalid toml { ]").unwrap();
+        
+        let result = Config::from_path(temp_file.path());
+        assert!(result.is_err());
+        
+        if let Err(e) = result {
+            match e {
+                crate::core::error::TwinError::Config { message, .. } => {
+                    assert!(message.contains("Failed to parse config"));
+                }
+                _ => panic!("Expected Config error"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_config_settings_default() {
+        let settings = ConfigSettings::default();
+        assert_eq!(settings.files.len(), 0);
+        assert_eq!(settings.branch_prefix, Some("agent".to_string()));
+        assert!(settings.worktree_base.is_none());
+        
+        // HookConfigもデフォルトで空
+        assert_eq!(settings.hooks.pre_create.len(), 0);
+        assert_eq!(settings.hooks.post_create.len(), 0);
+        assert_eq!(settings.hooks.pre_remove.len(), 0);
+        assert_eq!(settings.hooks.post_remove.len(), 0);
+    }
+
+    // AgentEnvironment関連のテスト
+    #[test]
+    fn test_agent_environment_creation() {
+        let env = AgentEnvironment::new(
+            "test-agent".to_string(),
+            "feature/test".to_string(),
+            PathBuf::from("/tmp/test-agent"),
+            None,
+        );
+        
+        assert_eq!(env.name, "test-agent");
+        assert_eq!(env.branch, "feature/test");
+        assert_eq!(env.worktree_path, PathBuf::from("/tmp/test-agent"));
+        assert_eq!(env.symlinks.len(), 0);
+        assert!(matches!(env.status, EnvironmentStatus::Creating));
+        assert!(env.config_path.is_none());
+    }
+
+    #[test]
+    fn test_agent_environment_is_active() {
+        let mut env = AgentEnvironment::new(
+            "test".to_string(),
+            "test".to_string(),
+            PathBuf::from("/tmp"),
+            None,
+        );
+        
+        // Creating状態ではfalse
+        assert!(!env.is_active());
+        
+        // Active状態ではtrue
+        env.status = EnvironmentStatus::Active;
+        assert!(env.is_active());
+        
+        // Inactive状態ではfalse
+        env.status = EnvironmentStatus::Inactive;
+        assert!(!env.is_active());
+        
+        // Error状態ではfalse
+        env.status = EnvironmentStatus::Error("error".to_string());
+        assert!(!env.is_active());
+    }
+
+    // EnvironmentRegistry関連のテスト
+    #[test]
+    fn test_registry_add_and_get() {
+        let mut registry = EnvironmentRegistry::new();
+        
+        let env = AgentEnvironment::new(
+            "test1".to_string(),
+            "branch1".to_string(),
+            PathBuf::from("/tmp/test1"),
+            None,
+        );
+        
+        registry.add(env.clone());
+        
+        // 追加したものが取得できる
+        let retrieved = registry.get("test1");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().name, "test1");
+        
+        // 存在しないものはNone
+        assert!(registry.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_registry_remove() {
+        let mut registry = EnvironmentRegistry::new();
+        
+        let env1 = AgentEnvironment::new(
+            "test1".to_string(),
+            "branch1".to_string(),
+            PathBuf::from("/tmp/test1"),
+            None,
+        );
+        
+        let env2 = AgentEnvironment::new(
+            "test2".to_string(),
+            "branch2".to_string(),
+            PathBuf::from("/tmp/test2"),
+            None,
+        );
+        
+        registry.add(env1);
+        registry.add(env2);
+        
+        assert_eq!(registry.environments.len(), 2);
+        
+        // test1を削除
+        let removed = registry.remove("test1");
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().name, "test1");
+        
+        // 削除後は1つだけ
+        assert_eq!(registry.environments.len(), 1);
+        assert!(registry.get("test1").is_none());
+        assert!(registry.get("test2").is_some());
+        
+        // 存在しないものを削除しようとするとNone
+        assert!(registry.remove("nonexistent").is_none());
+    }
+
+    // 小さい型のテスト
+    #[test]
+    fn test_environment_status_display() {
+        // EnvironmentStatusは独自のDisplay実装がないため、Debug表示をテスト
+        assert_eq!(format!("{:?}", EnvironmentStatus::Active), "Active");
+        assert_eq!(format!("{:?}", EnvironmentStatus::Inactive), "Inactive");
+        assert_eq!(format!("{:?}", EnvironmentStatus::Creating), "Creating");
+        assert_eq!(format!("{:?}", EnvironmentStatus::Removing), "Removing");
+        assert_eq!(format!("{:?}", EnvironmentStatus::Error("test".to_string())), "Error(\"test\")");
+    }
+
+    #[test]
+    fn test_mapping_type_default() {
+        assert_eq!(default_mapping_type(), MappingType::Symlink);
+        
+        // Deserializeのデフォルトも確認
+        let mapping: FileMapping = serde_json::from_str(
+            r#"{"path": "test.txt"}"#
+        ).unwrap();
+        assert_eq!(mapping.mapping_type, MappingType::Symlink);
+    }
+
+    #[test]
+    fn test_file_mapping_skip_if_exists_default() {
+        let mapping = FileMapping {
+            path: PathBuf::from("test.txt"),
+            mapping_type: MappingType::Symlink,
+            description: None,
+            skip_if_exists: false, // デフォルトはfalse
+        };
+        
+        assert!(!mapping.skip_if_exists);
+    }
+
+    #[test]
+    fn test_file_mapping_with_description() {
+        let mapping_with = FileMapping {
+            path: PathBuf::from("test.txt"),
+            mapping_type: MappingType::Copy,
+            description: Some("Test file".to_string()),
+            skip_if_exists: true,
+        };
+        
+        let mapping_without = FileMapping {
+            path: PathBuf::from("test2.txt"),
+            mapping_type: MappingType::Symlink,
+            description: None,
+            skip_if_exists: false,
+        };
+        
+        assert_eq!(mapping_with.description, Some("Test file".to_string()));
+        assert!(mapping_without.description.is_none());
+    }
+
+    #[test]
+    fn test_hook_config_default_empty() {
+        let config = HookConfig::default();
+        assert!(config.pre_create.is_empty());
+        assert!(config.post_create.is_empty());
+        assert!(config.pre_remove.is_empty());
+        assert!(config.post_remove.is_empty());
+    }
+
+    #[test]
+    fn test_hook_command_creation() {
+        let cmd = HookCommand {
+            command: "echo test".to_string(),
+            args: vec![],
+            env: HashMap::new(),
+            timeout: 60,
+            continue_on_error: false,
+        };
+        
+        assert_eq!(cmd.command, "echo test");
+        assert!(!cmd.continue_on_error);
+        assert_eq!(cmd.timeout, 60);
+        assert!(cmd.env.is_empty());
+        assert!(cmd.args.is_empty());
+    }
+
+    #[test]
+    fn test_symlink_info_states() {
+        let mut info = SymlinkInfo::new(
+            PathBuf::from("/source"),
+            PathBuf::from("/target"),
+        );
+        
+        assert!(!info.is_valid);
+        assert!(info.error_message.is_none());
+        
+        info.set_success();
+        assert!(info.is_valid);
+        assert!(info.error_message.is_none());
+        
+        info.set_error("Test error".to_string());
+        assert!(!info.is_valid);
+        assert_eq!(info.error_message, Some("Test error".to_string()));
+    }
+}

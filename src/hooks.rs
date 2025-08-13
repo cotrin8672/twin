@@ -419,7 +419,10 @@ mod tests {
 
         let hook = HookCommand {
             command: "echo test".to_string(),
-            args: None,
+            args: vec![],
+            env: HashMap::new(),
+            timeout: 60,
+            continue_on_error: false,
         };
 
         let result = executor
