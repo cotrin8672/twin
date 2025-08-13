@@ -12,7 +12,7 @@
     - 部分的失敗時の状態管理用の型を追加
     - _Requirements: 1.1, 2.1, 2.4_
 
-  - [ ] 2.2 設定システムの実装
+  - [x] 2.2 設定システムの実装
     - TOML設定ファイルの読み込み・書き込み機能を実装
     - シンボリックリンク設定の定義機能（source/target ペア）を実装
     - フック機能の設定（pre_create, post_create, pre_remove, post_remove）を実装
