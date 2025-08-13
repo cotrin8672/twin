@@ -2,6 +2,14 @@
 
 Kiro-style Spec Driven Development implementation using claude code slash commands, hooks and agents.
 
+## 実装時の注意事項
+
+### CLIツール開発の原則
+- **シンプルに実装する** - 余計な機能を追加しない
+- **要件を勝手に追加しない** - 仕様書に書かれたことのみ実装
+- **過度な親切は不要** - エラー時の冗長な案内や説明は避ける
+- **戦略は事前に決定** - 実行時の条件が分かるなら最初から適切な処理を選択
+
 ## Project Context
 
 ### Paths
