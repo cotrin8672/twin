@@ -111,8 +111,8 @@ impl EnvironmentManager {
         let worktree_path = self.git.generate_worktree_path(&name);
         
         // pre_createフックを実行
-        if let Some(ref pre_create) = self.config.settings.hooks.pre_create {
-            self.execute_hook(pre_create, &name)?;
+        for hook in &self.config.settings.hooks.pre_create {
+            self.execute_hook(hook, &name)?;
         }
         
         // Worktreeを作成
@@ -120,23 +120,24 @@ impl EnvironmentManager {
         
         // シンボリックリンクを作成
         let mut symlinks = Vec::new();
-        if let Some(mappings) = &self.config.settings.file_mappings {
+        if !self.config.settings.files.is_empty() {
+            let mappings = &self.config.settings.files;
             for mapping in mappings {
-                let source = worktree_path.join(&mapping.source);
-                let target = PathBuf::from(&mapping.target);
+                let source = worktree_path.join(&mapping.path);
+                let target = mapping.path.clone();
                 
                 // ターゲットの親ディレクトリを作成
                 if let Some(parent) = target.parent() {
                     std::fs::create_dir_all(parent)
                         .map_err(|e| TwinError::Io {
                             message: format!("Failed to create parent directory: {}", e),
-                            path: parent.to_path_buf(),
-                            operation: "create directory".to_string(),
+                            path: Some(parent.to_path_buf()),
+                            source: None,
                         })?;
                 }
                 
                 // シンボリックリンクを作成
-                self.symlink.create_link(&source, &target)?;
+                self.symlink.create_symlink(&source, &target)?;
                 
                 symlinks.push(crate::core::types::SymlinkInfo {
                     source: source.clone(),
@@ -165,8 +166,8 @@ impl EnvironmentManager {
         self.save_registry()?;
         
         // post_createフックを実行
-        if let Some(ref post_create) = self.config.settings.hooks.post_create {
-            self.execute_hook(post_create, &name)?;
+        for hook in &self.config.settings.hooks.post_create {
+            self.execute_hook(hook, &name)?;
         }
         
         Ok(env)
@@ -176,12 +177,15 @@ impl EnvironmentManager {
     pub fn remove_environment(&mut self, name: &str, force: bool) -> TwinResult<()> {
         // 環境を取得
         let env = self.registry.get(name)
-            .ok_or_else(|| TwinError::NotFound(format!("Environment '{}'", name)))?
+            .ok_or_else(|| TwinError::NotFound {
+                resource: "environment".to_string(),
+                name: name.to_string(),
+            })?
             .clone();
         
         // pre_removeフックを実行
-        if let Some(ref pre_remove) = self.config.settings.hooks.pre_remove {
-            self.execute_hook(pre_remove, name)?;
+        for hook in &self.config.settings.hooks.pre_remove {
+            self.execute_hook(hook, name)?;
         }
         
         // シンボリックリンクを削除
@@ -209,8 +213,8 @@ impl EnvironmentManager {
         self.save_registry()?;
         
         // post_removeフックを実行
-        if let Some(ref post_remove) = self.config.settings.hooks.post_remove {
-            self.execute_hook(post_remove, name)?;
+        for hook in &self.config.settings.hooks.post_remove {
+            self.execute_hook(hook, name)?;
         }
         
         Ok(())
@@ -238,7 +242,7 @@ impl EnvironmentManager {
             Ok(output) => {
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    if !hook.continue_on_error.unwrap_or(true) {
+                    if !hook.continue_on_error {
                         return Err(TwinError::Hook {
                             message: format!("Hook failed: {}", stderr),
                             hook_type: "command".to_string(),
@@ -251,7 +255,7 @@ impl EnvironmentManager {
                 Ok(())
             }
             Err(e) => {
-                if !hook.continue_on_error.unwrap_or(true) {
+                if !hook.continue_on_error {
                     Err(TwinError::Hook {
                         message: format!("Failed to execute hook: {}", e),
                         hook_type: "command".to_string(),
