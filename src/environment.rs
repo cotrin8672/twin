@@ -219,6 +219,32 @@ impl EnvironmentManager {
         
         Ok(())
     }
+
+    /// 環境一覧を取得（Git Worktreeのラッパー）
+    pub fn list_environments(&mut self) -> TwinResult<Vec<crate::git::WorktreeInfo>> {
+        // Git Worktreeの一覧を取得
+        let worktrees = self.git.list_worktrees()?;
+        
+        // メインのworktreeを除外して返す（エージェント環境のみ）
+        Ok(worktrees.into_iter()
+            .filter(|w| w.path != self.git.get_repo_path())
+            .collect())
+    }
+    
+    /// レジストリから環境一覧を取得
+    pub fn list_environments_from_registry(&self) -> Vec<&AgentEnvironment> {
+        self.registry.environments.values().collect()
+    }
+    
+    /// アクティブな環境を取得
+    pub fn get_active_environment(&self) -> Option<&AgentEnvironment> {
+        self.registry.get_active()
+    }
+    
+    /// 環境が存在するかチェック
+    pub fn environment_exists(&self, name: &str) -> bool {
+        self.registry.get(name).is_some()
+    }
     
     /// フックを実行
     fn execute_hook(&self, hook: &HookCommand, env_name: &str) -> TwinResult<()> {
