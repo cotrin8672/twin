@@ -87,7 +87,7 @@ impl EnvironmentManager {
         Ok(())
     }
     
-    /// 環境を作成
+    /// 環境を作成（失敗時は自動ロールバック）
     pub fn create_environment(&mut self, name: String, branch: Option<String>) -> TwinResult<AgentEnvironment> {
         // 既存の環境名をチェック
         if self.registry.get(&name).is_some() {
@@ -110,16 +110,34 @@ impl EnvironmentManager {
         // Worktreeのパスを生成
         let worktree_path = self.git.generate_worktree_path(&name);
         
+        // ロールバック用のクロージャ
+        let rollback_path = worktree_path.clone();
+        let rollback_name = name.clone();
+        let rollback = || {
+            eprintln!("Rolling back environment creation for '{}'", rollback_name);
+            if rollback_path.exists() {
+                if let Err(e) = std::fs::remove_dir_all(&rollback_path) {
+                    eprintln!("Failed to remove worktree directory during rollback: {}", e);
+                }
+            }
+        };
+        
         // pre_createフックを実行
         for hook in &self.config.settings.hooks.pre_create {
-            self.execute_hook(hook, &name)?;
+            if let Err(e) = self.execute_hook(hook, &name) {
+                rollback();
+                return Err(e);
+            }
         }
         
         // Worktreeを作成
-        self.git.add_worktree(&worktree_path, Some(&unique_branch), true)?;
+        if let Err(e) = self.git.add_worktree(&worktree_path, Some(&unique_branch), true) {
+            rollback();
+            return Err(e);
+        }
         
         // シンボリックリンクを作成
-        let mut symlinks = Vec::new();
+        let mut symlinks: Vec<crate::core::types::SymlinkInfo> = Vec::new();
         if !self.config.settings.files.is_empty() {
             let mappings = &self.config.settings.files;
             for mapping in mappings {
@@ -128,16 +146,29 @@ impl EnvironmentManager {
                 
                 // ターゲットの親ディレクトリを作成
                 if let Some(parent) = target.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| TwinError::Io {
+                    if let Err(e) = std::fs::create_dir_all(parent) {
+                        rollback();
+                        // 作成済みのシンボリックリンクを削除
+                        for created_link in &symlinks {
+                            let _ = self.symlink.remove_symlink(&created_link.target);
+                        }
+                        return Err(TwinError::Io {
                             message: format!("Failed to create parent directory: {}", e),
                             path: Some(parent.to_path_buf()),
                             source: None,
-                        })?;
+                        });
+                    }
                 }
                 
                 // シンボリックリンクを作成
-                self.symlink.create_symlink(&source, &target)?;
+                if let Err(e) = self.symlink.create_symlink(&source, &target) {
+                    rollback();
+                    // 作成済みのシンボリックリンクを削除
+                    for created_link in &symlinks {
+                        let _ = self.symlink.remove_symlink(&created_link.target);
+                    }
+                    return Err(e);
+                }
                 
                 symlinks.push(crate::core::types::SymlinkInfo {
                     source: source.clone(),
@@ -163,11 +194,30 @@ impl EnvironmentManager {
         // レジストリに追加
         self.registry.add(env.clone());
         self.registry.set_active(Some(name.clone()));
-        self.save_registry()?;
+        if let Err(e) = self.save_registry() {
+            // レジストリ保存に失敗したらロールバック
+            rollback();
+            self.registry.remove(&name);
+            // 作成済みのシンボリックリンクを削除
+            for created_link in &env.symlinks {
+                let _ = self.symlink.remove_symlink(&created_link.target);
+            }
+            return Err(e);
+        }
         
         // post_createフックを実行
         for hook in &self.config.settings.hooks.post_create {
-            self.execute_hook(hook, &name)?;
+            if let Err(e) = self.execute_hook(hook, &name) {
+                // post_createフックが失敗した場合もロールバック
+                rollback();
+                self.registry.remove(&name);
+                let _ = self.save_registry();
+                // 作成済みのシンボリックリンクを削除
+                for created_link in &env.symlinks {
+                    let _ = self.symlink.remove_symlink(&created_link.target);
+                }
+                return Err(e);
+            }
         }
         
         Ok(env)
