@@ -1707,6 +1707,7 @@ dependencies = [
  "crossterm 0.29.0",
  "directories",
  "git2",
+ "log",
  "mockall",
  "notify",
  "pretty_assertions",
