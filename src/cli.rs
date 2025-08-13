@@ -1,3 +1,12 @@
+// This file is kept for backward compatibility
+// The actual CLI implementation is now in cli/mod.rs
+
+pub mod commands;
+mod output;
+
+pub use commands::*;
+pub use output::*;
+
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 

@@ -12,6 +12,7 @@ use clap::Parser;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::cli::{Cli, Commands};
+use crate::cli::commands::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,25 +31,27 @@ async fn main() -> Result<()> {
     // Handle commands
     match cli.command {
         Commands::Create(args) => {
-            todo!("Implement create command")
+            handle_create(args).await?;
         }
         Commands::List(args) => {
-            todo!("Implement list command")
+            handle_list(args).await?;
         }
         Commands::Remove(args) => {
-            todo!("Implement remove command")
+            handle_remove(args).await?;
         }
         Commands::Switch(args) => {
-            todo!("Implement switch command")
+            handle_switch(args).await?;
         }
         Commands::Init(args) => {
-            todo!("Implement init command")
+            handle_init(args).await?;
         }
         Commands::Config(args) => {
-            todo!("Implement config command")
+            handle_config(args).await?;
         }
         Commands::Tui => {
             todo!("Implement TUI")
         }
     }
+    
+    Ok(())
 }
