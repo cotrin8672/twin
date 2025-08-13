@@ -7,7 +7,7 @@
 /// - リンクの検証と削除
 use crate::core::{SymlinkInfo, TwinError, TwinResult};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 /// リンク作成の戦略
@@ -331,7 +331,7 @@ impl SymlinkManager for WindowsSymlinkManager {
         Ok(false)
     }
     
-    fn select_strategy(&self, source: &Path, target: &Path) -> LinkStrategy {
+    fn select_strategy(&self, _source: &Path, _target: &Path) -> LinkStrategy {
         // 開発者モードまたは管理者権限があればシンボリックリンク
         // なければ最初からコピー
         if self.developer_mode || self.is_elevated {
