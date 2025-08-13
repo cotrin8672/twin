@@ -1,11 +1,10 @@
 /// Git操作モジュール
-/// 
+///
 /// このモジュールの役割：
 /// - git worktree add/remove/list コマンドのラッパー
 /// - ブランチの作成と管理
 /// - 自動コミット機能の実装
 /// - Gitリポジトリの状態確認
-
 use crate::core::TwinResult;
 use std::path::Path;
 

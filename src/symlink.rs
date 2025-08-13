@@ -1,11 +1,10 @@
 /// シンボリックリンク管理モジュール
-/// 
+///
 /// このモジュールの役割：
 /// - クロスプラットフォーム対応のシンボリックリンク作成
 /// - Unix: ln -s コマンドのラッパー
 /// - Windows: mklink コマンドのラッパー（管理者権限の処理も含む）
 /// - リンクの検証と削除
-
 use crate::core::{SymlinkInfo, TwinResult};
 use std::path::Path;
 
