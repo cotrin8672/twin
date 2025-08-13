@@ -32,12 +32,6 @@ pub enum Commands {
     /// エージェント環境を削除
     Remove(RemoveArgs),
 
-    /// 既存のエージェント環境に切り替え
-    Switch(SwitchArgs),
-
-    /// 設定ファイルを初期化
-    Init(InitArgs),
-
     /// 設定を管理
     Config(ConfigArgs),
 
@@ -87,33 +81,6 @@ pub struct RemoveArgs {
     pub agent_name: String,
 
     /// 確認なしで強制削除
-    #[arg(short, long)]
-    pub force: bool,
-}
-
-/// switchコマンドの引数
-#[derive(Parser)]
-pub struct SwitchArgs {
-    /// 切り替え先のエージェント名
-    pub agent_name: String,
-
-    /// 切り替え後にパスを表示
-    #[arg(long)]
-    pub print_path: bool,
-
-    /// 切り替え後にcdコマンドを表示
-    #[arg(long)]
-    pub cd_command: bool,
-}
-
-/// initコマンドの引数
-#[derive(Parser)]
-pub struct InitArgs {
-    /// 設定ファイルのパス
-    #[arg(short, long)]
-    pub path: Option<PathBuf>,
-
-    /// ファイルが存在する場合に強制上書き
     #[arg(short, long)]
     pub force: bool,
 }

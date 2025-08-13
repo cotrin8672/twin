@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// エージェント環境の情報
 /// 作成された環境の状態を保持し、永続化する
@@ -148,6 +148,35 @@ pub struct Config {
     pub global_path: Option<PathBuf>,
 }
 
+impl Config {
+    /// 新しい空の設定を作成
+    pub fn new() -> Self {
+        Self {
+            settings: ConfigSettings::default(),
+            path: None,
+            global_path: None,
+        }
+    }
+    
+    /// ファイルパスから設定を読み込み
+    pub fn from_path(path: &Path) -> crate::core::TwinResult<Self> {
+        use std::fs;
+        let content = fs::read_to_string(path)?;
+        let settings: ConfigSettings = toml::from_str(&content)
+            .map_err(|e| crate::core::error::TwinError::Config {
+                message: format!("Failed to parse config: {}", e),
+                path: Some(path.to_path_buf()),
+                source: None,
+            })?;
+        
+        Ok(Self {
+            settings,
+            path: Some(path.to_path_buf()),
+            global_path: None,
+        })
+    }
+}
+
 /// 設定の実際の内容
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigSettings {
@@ -162,6 +191,17 @@ pub struct ConfigSettings {
 
     /// デフォルトのブランチプレフィックス
     pub branch_prefix: Option<String>,
+}
+
+impl Default for ConfigSettings {
+    fn default() -> Self {
+        Self {
+            files: Vec::new(),
+            hooks: HookConfig::default(),
+            worktree_base: None,
+            branch_prefix: Some("agent".to_string()),
+        }
+    }
 }
 
 /// Git管理外ファイルのマッピング定義

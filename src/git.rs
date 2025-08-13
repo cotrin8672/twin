@@ -115,8 +115,16 @@ impl GitManager {
         info!("Executing: {}", command_str);
         self.command_history.push(command_str.clone());
 
+        // 透明性のあるコマンド実行ログ
+        if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
+            eprintln!("🔧 実行中: {}", command_str);
+        }
+
         if self.dry_run {
             info!("[DRY RUN] Would execute: {}", command_str);
+            if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
+                eprintln!("📝 ドライラン: {}", command_str);
+            }
             return Ok(Output {
                 #[cfg(unix)]
                 status: std::os::unix::process::ExitStatusExt::from_raw(0),

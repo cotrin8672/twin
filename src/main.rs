@@ -40,12 +40,6 @@ async fn main() -> Result<()> {
         Commands::Remove(args) => {
             handle_remove(args).await?;
         }
-        Commands::Switch(args) => {
-            handle_switch(args).await?;
-        }
-        Commands::Init(args) => {
-            handle_init(args).await?;
-        }
         Commands::Config(args) => {
             handle_config(args).await?;
         }

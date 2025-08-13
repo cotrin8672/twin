@@ -5,6 +5,23 @@ use std::path::Path;
 
 use crate::core::{AgentEnvironment, EnvironmentStatus};
 
+/// 出力フォーマッタークラス
+pub struct OutputFormatter {
+    format: OutputFormat,
+}
+
+impl OutputFormatter {
+    pub fn new(format_str: &str) -> Self {
+        let format = OutputFormat::from_str(format_str).unwrap_or(OutputFormat::Table);
+        Self { format }
+    }
+    
+    pub fn format_environments(&self, environments: &[AgentEnvironment]) -> Result<()> {
+        let env_refs: Vec<&AgentEnvironment> = environments.iter().collect();
+        format_environments(&env_refs, &self.format, None)
+    }
+}
+
 /// 出力フォーマットの種類
 #[derive(Debug, Clone)]
 pub enum OutputFormat {
