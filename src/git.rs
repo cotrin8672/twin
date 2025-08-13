@@ -9,7 +9,6 @@ use crate::core::{TwinError, TwinResult};
 use chrono::{DateTime, Local};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -119,7 +118,10 @@ impl GitManager {
         if self.dry_run {
             info!("[DRY RUN] Would execute: {}", command_str);
             return Ok(Output {
-                status: std::process::ExitStatus::from_raw(0),
+                #[cfg(unix)]
+                status: std::os::unix::process::ExitStatusExt::from_raw(0),
+                #[cfg(windows)]
+                status: std::os::windows::process::ExitStatusExt::from_raw(0),
                 stdout: b"[DRY RUN]".to_vec(),
                 stderr: Vec::new(),
             });
