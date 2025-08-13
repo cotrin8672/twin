@@ -8,7 +8,7 @@
 use crate::core::{HookCommand, TwinError, TwinResult};
 use log::{debug, error, info, warn};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Output};
 
 /// フックのタイプ

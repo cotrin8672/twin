@@ -3,7 +3,7 @@ pub mod types;
 
 pub use error::{TwinError, TwinResult};
 pub use types::{
-    AgentEnvironment, Config, ConfigSettings, EnvironmentRegistry, EnvironmentStatus, FileMapping,
-    HookCommand, HookConfig, MappingType, OperationStep, OperationType, PartialFailureState,
+    AgentEnvironment, Config, EnvironmentStatus, FileMapping,
+    HookCommand, HookConfig, MappingType,
     SymlinkInfo,
 };
