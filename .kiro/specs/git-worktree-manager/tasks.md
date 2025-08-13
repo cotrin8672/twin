@@ -1,11 +1,11 @@
 # Implementation Plan
 
-- [x] 1. プロジェクト基盤の構築
+- [ ] 1. プロジェクト基盤の構築
   - Cargo.tomlの作成とクレート依存関係の設定（clap, ratatui, serde, toml, notify等）
   - 基本的なプロジェクト構造とモジュール定義の実装
   - _Requirements: 1.1, 4.4, 5.1, 6.1_
 
-- [ ] 2. コア型定義とエラーハンドリング
+- [x] 2. コア型定義とエラーハンドリング
   - [x] 2.1 基本データ型とエラー型の定義
     - AgentEnvironment、Config、SymlinkInfo等の構造体を定義
     - 包括的なカスタムエラー型（GitError, SymlinkError, ConfigError等）を実装

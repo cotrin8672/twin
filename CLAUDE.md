@@ -46,6 +46,7 @@ Kiro-style Spec Driven Development implementation using claude code slash comman
 5. **Update task status**: Mark tasks as completed when working on them
 6. **Keep steering current**: Run `/kiro:steering` after significant changes
 7. **Check spec compliance**: Use `/kiro:spec-status` to verify alignment
+8. **Commit frequently**: タスクが完了するごとに @git-commit-expert サブエージェントを呼び出してコミットを実行する。小さな論理的単位でこまめにコミットすることで、変更履歴を明確に保つ
 
 ## Steering Configuration
 
