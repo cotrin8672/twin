@@ -65,7 +65,7 @@ impl GitManager {
     /// 新しいGitManagerインスタンスを作成
     pub fn new(repo_path: &Path) -> TwinResult<Self> {
         let repo_path = repo_path.to_path_buf();
-        
+
         // git2ライブラリを使用してリポジトリを開く
         let repository = match git2::Repository::open(&repo_path) {
             Ok(repo) => {
@@ -135,10 +135,7 @@ impl GitManager {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(TwinError::git(format!(
-                "Git command failed: {}",
-                stderr
-            )));
+            return Err(TwinError::git(format!("Git command failed: {}", stderr)));
         }
 
         Ok(output)
@@ -169,7 +166,10 @@ impl GitManager {
         }
 
         let output = self.execute_git_command(&args)?;
-        debug!("Worktree added: {:?}", String::from_utf8_lossy(&output.stdout));
+        debug!(
+            "Worktree added: {:?}",
+            String::from_utf8_lossy(&output.stdout)
+        );
 
         // 作成されたWorktreeの情報を取得
         self.get_worktree_info(path)
@@ -196,7 +196,7 @@ impl GitManager {
     pub fn list_worktrees(&mut self) -> TwinResult<Vec<WorktreeInfo>> {
         let output = self.execute_git_command(&["worktree", "list", "--porcelain"])?;
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         self.parse_worktree_list(&stdout)
     }
 
@@ -252,7 +252,7 @@ impl GitManager {
     /// 特定のWorktreeの情報を取得
     pub fn get_worktree_info(&mut self, path: &Path) -> TwinResult<WorktreeInfo> {
         let worktrees = self.list_worktrees()?;
-        
+
         worktrees
             .into_iter()
             .find(|wt| wt.path == path)
@@ -286,7 +286,11 @@ impl GitManager {
     }
 
     /// ブランチを作成
-    pub fn create_branch(&mut self, branch_name: &str, start_point: Option<&str>) -> TwinResult<()> {
+    pub fn create_branch(
+        &mut self,
+        branch_name: &str,
+        start_point: Option<&str>,
+    ) -> TwinResult<()> {
         let mut args = vec!["branch", branch_name];
 
         if let Some(start) = start_point {
@@ -368,13 +372,9 @@ impl GitManager {
     }
 
     /// エージェント用のブランチ名を生成
-    pub fn generate_agent_branch_name(
-        &self,
-        agent_name: &str,
-        suffix: Option<&str>,
-    ) -> String {
+    pub fn generate_agent_branch_name(&self, agent_name: &str, suffix: Option<&str>) -> String {
         let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-        
+
         if let Some(suffix) = suffix {
             format!("agent/{}-{}-{}", agent_name, suffix, timestamp)
         } else {
@@ -410,7 +410,7 @@ impl GitManager {
         // タイムスタンプ付きの名前を生成
         let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
         let name = format!("{}-{}", base_name, timestamp);
-        
+
         if !self.branch_exists(&name)? {
             Ok(name)
         } else {
@@ -445,7 +445,8 @@ impl GitManager {
 
     /// Worktreeのパスを生成
     pub fn generate_worktree_path(&self, agent_name: &str) -> PathBuf {
-        self.repo_path.parent()
+        self.repo_path
+            .parent()
             .unwrap_or(&self.repo_path)
             .join(format!("twin-{}", agent_name))
     }
@@ -458,8 +459,7 @@ impl GitManager {
     /// シェル関数用のヘルパースクリプトを生成
     pub fn generate_shell_helper(&self, shell_type: ShellType) -> String {
         match shell_type {
-            ShellType::Bash | ShellType::Zsh => {
-                r#"
+            ShellType::Bash | ShellType::Zsh => r#"
 # Twin worktree helper function
 twin-switch() {
     if [ -z "$1" ]; then
@@ -493,10 +493,9 @@ twin-create() {
         return 1
     fi
 }
-"#.to_string()
-            }
-            ShellType::PowerShell => {
-                r#"
+"#
+            .to_string(),
+            ShellType::PowerShell => r#"
 # Twin worktree helper function
 function Twin-Switch {
     param(
@@ -528,10 +527,9 @@ function Twin-Create {
         Write-Error "Failed to create agent: $AgentName"
     }
 }
-"#.to_string()
-            }
-            ShellType::Fish => {
-                r#"
+"#
+            .to_string(),
+            ShellType::Fish => r#"
 # Twin worktree helper function
 function twin-switch
     if test -z "$argv[1]"
@@ -565,44 +563,41 @@ function twin-create
         return 1
     end
 end
-"#.to_string()
-            }
+"#
+            .to_string(),
         }
     }
 
     /// エイリアス設定を生成
     pub fn generate_aliases(&self, shell_type: ShellType) -> String {
         match shell_type {
-            ShellType::Bash | ShellType::Zsh => {
-                r#"
+            ShellType::Bash | ShellType::Zsh => r#"
 # Twin aliases
 alias tw='twin'
 alias tws='twin-switch'
 alias twc='twin-create'
 alias twl='twin list'
 alias twr='twin remove'
-"#.to_string()
-            }
-            ShellType::PowerShell => {
-                r#"
+"#
+            .to_string(),
+            ShellType::PowerShell => r#"
 # Twin aliases
 Set-Alias -Name tw -Value twin
 Set-Alias -Name tws -Value Twin-Switch
 Set-Alias -Name twc -Value Twin-Create
 Set-Alias -Name twl -Value 'twin list'
 Set-Alias -Name twr -Value 'twin remove'
-"#.to_string()
-            }
-            ShellType::Fish => {
-                r#"
+"#
+            .to_string(),
+            ShellType::Fish => r#"
 # Twin aliases
 alias tw='twin'
 alias tws='twin-switch'
 alias twc='twin-create'
 alias twl='twin list'
 alias twr='twin remove'
-"#.to_string()
-            }
+"#
+            .to_string(),
         }
     }
 }

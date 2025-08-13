@@ -3,6 +3,7 @@ mod config;
 mod core;
 mod environment;
 mod git;
+mod hooks;
 mod symlink;
 mod tui;
 mod utils;
@@ -11,8 +12,8 @@ use anyhow::Result;
 use clap::Parser;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::cli::{Cli, Commands};
 use crate::cli::commands::*;
+use crate::cli::{Cli, Commands};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -52,6 +53,6 @@ async fn main() -> Result<()> {
             todo!("Implement TUI")
         }
     }
-    
+
     Ok(())
 }

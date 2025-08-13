@@ -99,15 +99,13 @@ impl Config {
                         continue_on_error: false,
                     },
                 ],
-                pre_remove: vec![
-                    HookCommand {
-                        command: "echo".to_string(),
-                        args: vec!["Cleaning up environment...".to_string()],
-                        env: HashMap::new(),
-                        timeout: 60,
-                        continue_on_error: true,
-                    },
-                ],
+                pre_remove: vec![HookCommand {
+                    command: "echo".to_string(),
+                    args: vec!["Cleaning up environment...".to_string()],
+                    env: HashMap::new(),
+                    timeout: 60,
+                    continue_on_error: true,
+                }],
                 post_remove: vec![],
             },
             worktree_base: Some(PathBuf::from("./worktrees")),
@@ -141,23 +139,23 @@ impl Config {
     /// 設定ファイルのパスを取得（プロジェクトルートから検索）
     pub async fn find_config_path(start_path: &Path) -> Option<PathBuf> {
         let mut current = start_path.to_path_buf();
-        
+
         loop {
             let config_path = current.join("twin.toml");
             if config_path.exists() {
                 return Some(config_path);
             }
-            
+
             let dot_config_path = current.join(".twin.toml");
             if dot_config_path.exists() {
                 return Some(dot_config_path);
             }
-            
+
             if !current.pop() {
                 break;
             }
         }
-        
+
         None
     }
 
@@ -171,7 +169,7 @@ impl Config {
     /// 設定ファイルを初期化（twin initコマンド用）
     pub async fn init(path: Option<PathBuf>, force: bool) -> Result<PathBuf> {
         let config_path = path.unwrap_or_else(|| PathBuf::from("twin.toml"));
-        
+
         // ファイルが既に存在する場合
         if config_path.exists() && !force {
             anyhow::bail!(
@@ -179,11 +177,11 @@ impl Config {
                 config_path.display()
             );
         }
-        
+
         // サンプル設定を作成
         let config = Self::example();
         config.save(&config_path).await?;
-        
+
         Ok(config_path)
     }
 
@@ -195,14 +193,14 @@ impl Config {
                 return Self::load(&config_path).await;
             }
         }
-        
+
         // グローバル設定を試す
         if let Ok(global_path) = Self::global_config_path() {
             if global_path.exists() {
                 return Self::load(&global_path).await;
             }
         }
-        
+
         // デフォルト設定を返す
         Ok(Self::default())
     }

@@ -221,19 +221,19 @@ pub struct HookConfig {
 pub struct HookCommand {
     /// 実行するコマンド
     pub command: String,
-    
+
     /// コマンド引数
     #[serde(default)]
     pub args: Vec<String>,
-    
+
     /// 環境変数
     #[serde(default)]
     pub env: HashMap<String, String>,
-    
+
     /// タイムアウト（秒）
     #[serde(default = "default_timeout")]
     pub timeout: u64,
-    
+
     /// エラー時も処理を続行するか
     #[serde(default)]
     pub continue_on_error: bool,
@@ -242,7 +242,6 @@ pub struct HookCommand {
 fn default_timeout() -> u64 {
     60 // デフォルト60秒
 }
-
 
 /// 部分的失敗時の状態を管理する構造体
 #[derive(Debug, Clone, Serialize, Deserialize)]

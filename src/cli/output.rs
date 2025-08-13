@@ -19,7 +19,10 @@ impl OutputFormat {
             "table" => Ok(OutputFormat::Table),
             "json" => Ok(OutputFormat::Json),
             "simple" => Ok(OutputFormat::Simple),
-            _ => Err(anyhow!("Invalid output format: {}. Use 'table', 'json', or 'simple'", s)),
+            _ => Err(anyhow!(
+                "Invalid output format: {}. Use 'table', 'json', or 'simple'",
+                s
+            )),
         }
     }
 }
@@ -45,22 +48,25 @@ fn format_table(environments: &[&AgentEnvironment], active_name: Option<&str>) -
     }
 
     // ヘッダー
-    println!("{:<2} {:<15} {:<20} {:<12} {:<10}", "", "Name", "Branch", "Created", "Status");
+    println!(
+        "{:<2} {:<15} {:<20} {:<12} {:<10}",
+        "", "Name", "Branch", "Created", "Status"
+    );
     println!("{}", "-".repeat(65));
 
     // 環境一覧
     for env in environments {
-        let active_marker = if Some(env.name.as_str()) == active_name { "*" } else { " " };
+        let active_marker = if Some(env.name.as_str()) == active_name {
+            "*"
+        } else {
+            " "
+        };
         let created = format_datetime(&env.created_at);
         let status = format_status(&env.status);
-        
+
         println!(
             "{:<2} {:<15} {:<20} {:<12} {:<10}",
-            active_marker,
-            env.name,
-            env.branch,
-            created,
-            status
+            active_marker, env.name, env.branch, created, status
         );
     }
 
@@ -82,7 +88,11 @@ fn format_json(environments: &[&AgentEnvironment]) -> Result<()> {
 /// シンプル形式で出力
 fn format_simple(environments: &[&AgentEnvironment], active_name: Option<&str>) -> Result<()> {
     for env in environments {
-        let active_marker = if Some(env.name.as_str()) == active_name { " (active)" } else { "" };
+        let active_marker = if Some(env.name.as_str()) == active_name {
+            " (active)"
+        } else {
+            ""
+        };
         println!("{}{}", env.name, active_marker);
     }
     Ok(())
@@ -92,9 +102,8 @@ fn format_simple(environments: &[&AgentEnvironment], active_name: Option<&str>) 
 pub fn format_path_output(path: &Path, show_cd_command: bool) -> Result<()> {
     if show_cd_command {
         // シェル検出
-        let shell = std::env::var("SHELL")
-            .unwrap_or_else(|_| "/bin/sh".to_string());
-        
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+
         if shell.contains("fish") {
             println!("cd '{}'", path.display());
         } else if shell.contains("zsh") || shell.contains("bash") {
@@ -103,14 +112,17 @@ pub fn format_path_output(path: &Path, show_cd_command: bool) -> Result<()> {
             // デフォルト
             println!("cd '{}'", path.display());
         }
-        
+
         println!();
         println!("To change directory, run:");
-        println!("  $(twin switch {} --cd-command)", path.file_name().unwrap_or_default().to_string_lossy());
+        println!(
+            "  $(twin switch {} --cd-command)",
+            path.file_name().unwrap_or_default().to_string_lossy()
+        );
     } else {
         println!("{}", path.display());
     }
-    
+
     Ok(())
 }
 
@@ -139,9 +151,18 @@ mod tests {
 
     #[test]
     fn test_output_format_from_str() {
-        assert!(matches!(OutputFormat::from_str("table"), Ok(OutputFormat::Table)));
-        assert!(matches!(OutputFormat::from_str("json"), Ok(OutputFormat::Json)));
-        assert!(matches!(OutputFormat::from_str("simple"), Ok(OutputFormat::Simple)));
+        assert!(matches!(
+            OutputFormat::from_str("table"),
+            Ok(OutputFormat::Table)
+        ));
+        assert!(matches!(
+            OutputFormat::from_str("json"),
+            Ok(OutputFormat::Json)
+        ));
+        assert!(matches!(
+            OutputFormat::from_str("simple"),
+            Ok(OutputFormat::Simple)
+        ));
         assert!(OutputFormat::from_str("invalid").is_err());
     }
 
@@ -151,6 +172,9 @@ mod tests {
         assert_eq!(format_status(&EnvironmentStatus::Inactive), "Inactive");
         assert_eq!(format_status(&EnvironmentStatus::Creating), "Creating");
         assert_eq!(format_status(&EnvironmentStatus::Removing), "Removing");
-        assert_eq!(format_status(&EnvironmentStatus::Error("test".to_string())), "Error: test");
+        assert_eq!(
+            format_status(&EnvironmentStatus::Error("test".to_string())),
+            "Error: test"
+        );
     }
 }
