@@ -1,0 +1,193 @@
+# twin.toml.example - Twin設定ファイルのサンプル
+# このファイルを twin.toml としてコピーして使用してください
+
+# ====================
+# 基本設定
+# ====================
+
+# ワークツリーを作成するベースディレクトリ
+# デフォルト: "./worktrees"
+# 相対パスまたは絶対パスを指定可能
+worktree_base = "./worktrees"
+
+# Gitブランチ名のプレフィックス
+# デフォルト: "agent/"
+# 例: agent-001 → agent/agent-001 ブランチが作成される
+branch_prefix = "agent/"
+
+# ====================
+# ファイルマッピング設定
+# ====================
+# 各環境で共有したいファイルやディレクトリを定義します
+# シンボリックリンク、コピー、テンプレート処理から選択可能
+
+# 例1: 設定ファイルをシンボリックリンクで共有
+[[files]]
+source = ".claude/config.template.json"  # ソースファイル
+target = ".claude/config.json"           # ワークツリー内の配置先
+mapping_type = "symlink"                 # リンク方式（symlink/copy/template）
+skip_if_exists = true                    # 既存ファイルがある場合はスキップ
+description = "Claude AI設定ファイル"
+
+# 例2: 環境変数ファイルをコピー（各環境で個別に編集可能）
+[[files]]
+source = ".env.template"
+target = ".env"
+mapping_type = "copy"                    # コピーして配置
+skip_if_exists = true                    # 既存の.envは上書きしない
+description = "環境変数設定"
+
+# 例3: VSCode設定を共有
+[[files]]
+source = ".vscode/settings.template.json"
+target = ".vscode/settings.json"
+mapping_type = "symlink"
+skip_if_exists = false                   # 常に上書き
+description = "VSCode設定"
+
+# 例4: Gitフックを共有
+[[files]]
+source = "shared/hooks"
+target = ".git/hooks"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "共有Gitフック"
+
+# 例5: npmパッケージ設定
+[[files]]
+source = "package.json"
+target = "package.json"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "npm依存関係"
+
+# 例6: Docker設定
+[[files]]
+source = "docker-compose.template.yml"
+target = "docker-compose.yml"
+mapping_type = "copy"
+skip_if_exists = true
+description = "Docker Compose設定"
+
+# ====================
+# フック設定
+# ====================
+# 環境の作成・削除時に実行するコマンドを定義
+# {name} は環境名（エージェント名）に置換されます
+
+[hooks]
+
+# 環境作成前に実行するコマンド
+pre_create = [
+    # ログ出力
+    { 
+        command = "echo '🚀 Creating environment: {name}'", 
+        continue_on_error = false 
+    },
+    
+    # 依存関係のインストール（エラーが出ても続行）
+    { 
+        command = "npm install", 
+        continue_on_error = true,
+        timeout = 300  # 5分のタイムアウト
+    },
+    
+    # ディレクトリ作成
+    { 
+        command = "mkdir -p ./worktrees/{name}/.cache", 
+        continue_on_error = true 
+    }
+]
+
+# 環境作成後に実行するコマンド
+post_create = [
+    # 成功メッセージ
+    { 
+        command = "echo '✅ Environment {name} created successfully'", 
+        continue_on_error = false 
+    },
+    
+    # VS Codeで開く（オプション）
+    { 
+        command = "code ./worktrees/{name}", 
+        continue_on_error = true 
+    },
+    
+    # 初期設定スクリプトの実行
+    { 
+        command = "./scripts/setup-environment.sh {name}", 
+        continue_on_error = true,
+        timeout = 120
+    },
+    
+    # Git設定
+    { 
+        command = "cd ./worktrees/{name} && git config user.email 'agent-{name}@example.com'", 
+        continue_on_error = true 
+    }
+]
+
+# 環境削除前に実行するコマンド
+pre_remove = [
+    # 警告メッセージ
+    { 
+        command = "echo '⚠️  Removing environment: {name}'", 
+        continue_on_error = false 
+    },
+    
+    # バックアップ作成（オプション）
+    { 
+        command = "tar -czf ./backups/{name}-$(date +%Y%m%d).tar.gz ./worktrees/{name}/.env ./worktrees/{name}/data", 
+        continue_on_error = true 
+    },
+    
+    # プロセスの停止
+    { 
+        command = "pkill -f 'worktrees/{name}'", 
+        continue_on_error = true 
+    }
+]
+
+# 環境削除後に実行するコマンド
+post_remove = [
+    # 完了メッセージ
+    { 
+        command = "echo '🗑️  Environment {name} removed'", 
+        continue_on_error = false 
+    },
+    
+    # キャッシュクリア
+    { 
+        command = "rm -rf /tmp/cache-{name}", 
+        continue_on_error = true 
+    }
+]
+
+# ====================
+# 高度な設定例（コメントアウト）
+# ====================
+
+# テンプレート処理を使用した設定（未実装）
+# [[files]]
+# source = "config.template"
+# target = "config.json"
+# mapping_type = "template"
+# variables = { 
+#     api_key = "${API_KEY}",
+#     environment = "{name}",
+#     port = "3000"
+# }
+
+# 条件付きマッピング（未実装）
+# [[files]]
+# source = "windows-config.json"
+# target = ".config/app.json"
+# mapping_type = "copy"
+# condition = "os.platform == 'windows'"
+
+# グループ化されたフック（未実装）
+# [hooks.groups.database]
+# pre_create = [
+#     { command = "docker-compose up -d postgres", continue_on_error = false },
+#     { command = "npm run db:migrate", continue_on_error = false }
+# ]
