@@ -134,18 +134,36 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
     if let Some(subcommand) = &args.subcommand {
         match subcommand.as_str() {
             "default" => {
-                // デフォルト設定をTOML形式で出力
-                let default_config = Config::default_example();
-                let toml_string = toml::to_string_pretty(&default_config.settings).map_err(|e| {
-                    crate::core::error::TwinError::Config {
-                        message: format!("デフォルト設定のシリアライズに失敗: {}", e),
-                        path: None,
-                        source: None,
-                    }
-                })?;
-                println!("# Twin設定ファイルのデフォルト例");
-                println!("# このファイルを .twin.toml として保存してください\n");
-                println!("{}", toml_string);
+                // デフォルト設定をTOML形式で出力（コメント付き）
+                println!("# Twin設定ファイル (.twin.toml)");
+                println!("# このファイルをプロジェクトルートに配置してください");
+                println!();
+                println!("# Worktreeのベースディレクトリ（省略時: ../ブランチ名）");
+                println!("# worktree_base = \"../workspaces\"");
+                println!();
+                println!("# ファイルマッピング設定");
+                println!("# Worktree作成時に自動的にシンボリックリンクやコピーを作成します");
+                println!("# [[files]]");
+                println!("# path = \".env.template\"          # ソースファイルのパス");
+                println!("# mapping_type = \"copy\"           # \"symlink\" または \"copy\"");
+                println!("# description = \"環境変数設定\"     # 説明（省略可）");
+                println!("# skip_if_exists = true           # 既存ファイルをスキップ（省略可）");
+                println!();
+                println!("# [[files]]");
+                println!("# path = \".claude/config.json\"");
+                println!("# mapping_type = \"symlink\"");
+                println!();
+                println!("# フック設定（環境作成・削除時に実行するコマンド）");
+                println!("[hooks]");
+                println!("# pre_create = [");
+                println!("#   {{ command = \"echo\", args = [\"Creating: {{branch}}\"] }}");
+                println!("# ]");
+                println!("# post_create = [");
+                println!("#   {{ command = \"npm\", args = [\"install\"], continue_on_error = true }}");
+                println!("# ]");
+                println!("# pre_remove = []");
+                println!("# post_remove = []");
+                
                 return Ok(());
             }
             _ => {

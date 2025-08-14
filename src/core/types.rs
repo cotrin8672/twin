@@ -166,53 +166,15 @@ impl Config {
         }
     }
     
-    /// デフォルト設定（例を含む）を作成
+    /// デフォルト設定（最小限）を作成
     pub fn default_example() -> Self {
-        // デフォルト設定に例を含める
-        let mut settings = ConfigSettings::default();
-        
-        // 例となるファイルマッピングを追加
-        settings.files = vec![
-            FileMapping {
-                path: PathBuf::from(".env.template"),
-                mapping_type: MappingType::Copy,
-                description: Some("環境変数設定ファイル".to_string()),
-                skip_if_exists: true,
-            },
-            FileMapping {
-                path: PathBuf::from(".claude/config.json"),
-                mapping_type: MappingType::Symlink,
-                description: Some("Claude設定ファイル".to_string()),
-                skip_if_exists: false,
-            },
-        ];
-        
-        // 例となるフックを追加
-        settings.hooks = HookConfig {
-            pre_create: vec![
-                HookCommand {
-                    command: "echo".to_string(),
-                    args: vec!["Creating worktree: {branch}".to_string()],
-                    env: HashMap::new(),
-                    timeout: 60,
-                    continue_on_error: false,
-                },
-            ],
-            post_create: vec![
-                HookCommand {
-                    command: "echo".to_string(),
-                    args: vec!["Worktree created at: {worktree_path}".to_string()],
-                    env: HashMap::new(),
-                    timeout: 60,
-                    continue_on_error: false,
-                },
-            ],
-            pre_remove: vec![],
-            post_remove: vec![],
+        // 最小限のデフォルト設定
+        let settings = ConfigSettings {
+            files: vec![],  // 空のファイルリスト
+            hooks: HookConfig::default(),  // すべて空のフック
+            worktree_base: None,  // デフォルト: ../ブランチ名
+            branch_prefix: None,  // 削除済み機能
         };
-        
-        // デフォルトのworktree_baseを設定
-        settings.worktree_base = Some(PathBuf::from("../workspaces"));
         
         Self {
             settings,
