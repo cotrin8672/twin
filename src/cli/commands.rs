@@ -1,17 +1,17 @@
 use crate::cli::output::OutputFormatter;
 use crate::cli::*;
 use crate::core::{Config, TwinResult};
-use crate::environment::EnvironmentManager;
 
 pub async fn handle_create(args: CreateArgs) -> TwinResult<()> {
+    use crate::git::GitManager;
+    use crate::symlink::create_symlink_manager;
+    
     // 設定を読み込む
     let config = if let Some(config_path) = &args.config {
         Config::from_path(config_path)?
     } else {
         Config::new()
     };
-
-    let mut manager = EnvironmentManager::new(config.clone())?;
 
     // ディレクトリの決定
     // 優先順位: 1. CLI引数 2. 設定ファイル 3. デフォルト(../branch_name)
@@ -24,45 +24,88 @@ pub async fn handle_create(args: CreateArgs) -> TwinResult<()> {
         std::path::PathBuf::from("..").join(&args.branch_name)
     };
 
-    // 環境を作成
-    let env = manager.create_environment(args.branch_name.clone(), worktree_dir)?;
+    // 絶対パスに変換
+    let worktree_path = if worktree_dir.is_relative() {
+        std::env::current_dir()?.join(&worktree_dir)
+    } else {
+        worktree_dir
+    };
+
+    // Git worktreeを作成
+    let mut git = GitManager::new(std::path::Path::new("."))?;
+    let worktree_info = git.add_worktree(&worktree_path, Some(&args.branch_name), true)?;
+    
+    // シンボリックリンクを作成
+    if !config.settings.files.is_empty() {
+        let symlink_manager = create_symlink_manager();
+        let repo_root = git.get_repo_path();
+        
+        for mapping in &config.settings.files {
+            let source = repo_root.join(&mapping.path);
+            let target = worktree_path.join(&mapping.path);
+            
+            // ターゲットディレクトリを作成
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            
+            // シンボリックリンクを作成
+            symlink_manager.create_symlink(&source, &target)?;
+        }
+    }
 
     // パス表示やcdコマンド表示の処理
     if args.print_path {
-        println!("{}", env.worktree_path.display());
+        println!("{}", worktree_path.display());
     } else if args.cd_command {
-        println!("cd \"{}\"", env.worktree_path.display());
+        println!("cd \"{}\"", worktree_path.display());
     } else {
-        println!("✓ 環境 '{}' を作成しました", args.branch_name);
-        println!("  Worktree: {}", env.worktree_path.display());
-        println!("  Branch: {}", env.branch);
+        println!("✓ Worktree '{}' を作成しました", args.branch_name);
+        println!("  Path: {}", worktree_path.display());
+        println!("  Branch: {}", worktree_info.branch);
     }
 
     Ok(())
 }
 
 pub async fn handle_list(args: ListArgs) -> TwinResult<()> {
-    let config = Config::new();
-    let manager = EnvironmentManager::new(config)?;
-    let environments = manager.list_environments_from_registry();
+    use crate::git::GitManager;
+    
+    // git worktree list を使用
+    let mut git = GitManager::new(std::path::Path::new("."))?;
+    let worktrees = git.list_worktrees()?;
 
     let formatter = OutputFormatter::new(&args.format);
-
-    // Vec<&AgentEnvironment> を Vec<AgentEnvironment> に変換
-    let environments_owned: Vec<_> = environments.into_iter().cloned().collect();
-    formatter.format_environments(&environments_owned)?;
+    formatter.format_worktrees(&worktrees)?;
 
     Ok(())
 }
 
 pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
-    let config = Config::new();
-    let mut manager = EnvironmentManager::new(config)?;
+    use crate::git::GitManager;
+    use std::path::PathBuf;
+    
+    // Worktreeのパスかブランチ名で削除
+    let mut git = GitManager::new(std::path::Path::new("."))?;
+    
+    // まずworktree一覧を取得して、対応するパスを探す
+    let worktrees = git.list_worktrees()?;
+    let worktree = worktrees.iter().find(|w| {
+        w.branch == args.branch_name || 
+        w.path.file_name().map(|n| n.to_string_lossy()) == Some(args.branch_name.clone().into())
+    });
+    
+    let path = if let Some(wt) = worktree {
+        wt.path.clone()
+    } else {
+        // パスとして解釈してみる
+        PathBuf::from(&args.branch_name)
+    };
 
     // 確認プロンプト
     if !args.force {
         use std::io::{self, Write};
-        print!("環境 '{}' を削除しますか？ [y/N]: ", args.branch_name);
+        print!("Worktree '{}' を削除しますか？ [y/N]: ", path.display());
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -74,8 +117,9 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
         }
     }
 
-    manager.remove_environment(&args.branch_name, args.force)?;
-    println!("✓ 環境 '{}' を削除しました", args.branch_name);
+    // git worktree remove を実行
+    git.remove_worktree(&path, args.force)?;
+    println!("✓ Worktree '{}' を削除しました", path.display());
 
     Ok(())
 }

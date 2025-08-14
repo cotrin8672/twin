@@ -4,6 +4,7 @@ use chrono::{DateTime, Local, Utc};
 use std::path::Path;
 
 use crate::core::{AgentEnvironment, EnvironmentStatus};
+use crate::git::WorktreeInfo;
 
 /// 出力フォーマッタークラス
 pub struct OutputFormatter {
@@ -19,6 +20,10 @@ impl OutputFormatter {
     pub fn format_environments(&self, environments: &[AgentEnvironment]) -> Result<()> {
         let env_refs: Vec<&AgentEnvironment> = environments.iter().collect();
         format_environments(&env_refs, &self.format, None)
+    }
+
+    pub fn format_worktrees(&self, worktrees: &[WorktreeInfo]) -> Result<()> {
+        format_worktrees(worktrees, &self.format)
     }
 }
 
@@ -159,6 +164,61 @@ fn format_status(status: &EnvironmentStatus) -> String {
         EnvironmentStatus::Removing => "Removing".to_string(),
         EnvironmentStatus::Error(msg) => format!("Error: {}", msg),
     }
+}
+
+/// Worktree一覧を指定されたフォーマットで出力
+pub fn format_worktrees(worktrees: &[WorktreeInfo], format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Table => format_worktrees_table(worktrees),
+        OutputFormat::Json => format_worktrees_json(worktrees),
+        OutputFormat::Simple => format_worktrees_simple(worktrees),
+    }
+}
+
+/// Worktree一覧をテーブル形式で出力
+fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
+    if worktrees.is_empty() {
+        println!("No worktrees found.");
+        return Ok(());
+    }
+
+    // ヘッダー
+    println!("{:<30} {:<30} {:<12}", "Path", "Branch", "HEAD");
+    println!("{}", "-".repeat(75));
+
+    // 各worktreeを出力
+    for worktree in worktrees {
+        let path = worktree.path.display().to_string();
+        let path_short = if path.len() > 29 {
+            format!("...{}", &path[path.len() - 26..])
+        } else {
+            path
+        };
+        
+        println!(
+            "{:<30} {:<30} {:<12}",
+            path_short,
+            worktree.branch,
+            &worktree.commit[..8.min(worktree.commit.len())]
+        );
+    }
+
+    Ok(())
+}
+
+/// Worktree一覧をJSON形式で出力
+fn format_worktrees_json(worktrees: &[WorktreeInfo]) -> Result<()> {
+    let json = serde_json::to_string_pretty(worktrees)?;
+    println!("{}", json);
+    Ok(())
+}
+
+/// Worktree一覧をシンプル形式で出力
+fn format_worktrees_simple(worktrees: &[WorktreeInfo]) -> Result<()> {
+    for worktree in worktrees {
+        println!("{} {} {}", worktree.path.display(), worktree.branch, worktree.commit);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
