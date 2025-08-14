@@ -1,0 +1,53 @@
+# Cargo設定 - ビルド高速化
+
+[build]
+# 並列ジョブ数を最適化（CPUコア数に応じて調整）
+jobs = 8
+
+# インクリメンタルコンパイルを有効化
+incremental = true
+
+# ターゲットディレクトリを共有
+target-dir = "target"
+
+# [target.x86_64-pc-windows-msvc]
+# # Windowsでのリンカー最適化（rust-lldがない場合はコメントアウト）
+# linker = "rust-lld.exe"
+# rustflags = ["-C", "link-arg=/DEBUG:NONE"]
+
+[profile.dev]
+# 開発ビルドの最適化
+opt-level = 0          # 最適化なし（最速ビルド）
+debug = 1              # 部分的なデバッグ情報（2は完全）
+split-debuginfo = "packed"
+incremental = true
+codegen-units = 256    # 並列コンパイル単位を増やす
+
+[profile.dev.package."*"]
+# 依存関係は最適化してビルド（実行速度向上）
+opt-level = 2
+debug = false
+
+[profile.release]
+# リリースビルドの設定
+opt-level = 3
+lto = "thin"           # Link Time Optimization
+codegen-units = 1
+
+[profile.test]
+# テスト実行時の最適化
+opt-level = 0
+debug = true
+incremental = true
+
+# sccacheを使う場合（インストール後にコメント解除）
+# [env]
+# RUSTC_WRAPPER = "sccache"
+
+[net]
+# 並列ダウンロード数を増やす
+git-fetch-with-cli = true
+
+[registries.crates-io]
+# cratesダウンロードの高速化
+protocol = "sparse"
