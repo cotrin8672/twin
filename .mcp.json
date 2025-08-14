@@ -8,16 +8,6 @@
         "@modelcontextprotocol/server-sequential-thinking"
       ]
     },
-    "context7": {
-      "type": "stdio",
-      "command": "bun",
-      "args": [
-        "x",
-        "-y",
-        "@upstash/context7-mcp"
-      ],
-      "env": {}
-    },
     "serena": {
       "type": "stdio",
       "command": "uvx",
@@ -41,6 +31,16 @@
         "x",
         "@mizchi/lsmcp",
         "--bin=rust-analyzer"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "bun",
+      "args": [
+        "x",
+        "-y",
+        "@upstash/context7-mcp"
       ],
       "env": {}
     }
