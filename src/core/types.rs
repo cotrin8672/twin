@@ -223,7 +223,7 @@ impl Default for ConfigSettings {
 /// Git管理外ファイルのマッピング定義
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileMapping {
-    /// ファイルパス（相対パス）
+    /// ファイルパス（メインリポジトリとワークツリーの両方で同じパス）
     pub path: PathBuf,
 
     /// マッピングタイプ（symlink or copy）
@@ -231,6 +231,7 @@ pub struct FileMapping {
     pub mapping_type: MappingType,
 
     /// 説明（オプション）
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
     /// 既に存在する場合はスキップ
