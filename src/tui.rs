@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// TUI (Terminal User Interface) モジュール
 ///
 /// このモジュールの役割：

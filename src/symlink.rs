@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// シンボリックリンク管理モジュール
 ///
 /// このモジュールの役割：
@@ -15,10 +16,6 @@ use std::process::Command;
 pub enum LinkStrategy {
     /// シンボリックリンク（推奨）
     Symlink,
-    /// ジャンクション（Windowsディレクトリ用）
-    Junction,
-    /// ハードリンク（同一ドライブのファイル用）
-    Hardlink,
     /// ファイルコピー（フォールバック）
     Copy,
 }
@@ -166,6 +163,13 @@ pub struct WindowsSymlinkManager {
 }
 
 #[cfg(windows)]
+impl Default for WindowsSymlinkManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(windows)]
 impl WindowsSymlinkManager {
     pub fn new() -> Self {
         Self {
@@ -178,7 +182,7 @@ impl WindowsSymlinkManager {
     fn check_developer_mode() -> bool {
         // レジストリをチェック
         let output = Command::new("reg")
-            .args(&[
+            .args([
                 "query",
                 "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
                 "/v",
@@ -198,7 +202,7 @@ impl WindowsSymlinkManager {
     fn check_elevation() -> bool {
         // 管理者権限が必要な操作を試みる
         Command::new("net")
-            .args(&["session"])
+            .args(["session"])
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
@@ -227,54 +231,6 @@ impl WindowsSymlinkManager {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(TwinError::symlink(
                 format!("mklink failed: {}", stderr),
-                Some(target.to_path_buf()),
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// ジャンクションを作成（ディレクトリ用、管理者権限不要）
-    fn create_junction(&self, source: &Path, target: &Path) -> TwinResult<()> {
-        let output = Command::new("cmd")
-            .args(&[
-                "/c",
-                &format!(
-                    "mklink /J \"{}\" \"{}\"",
-                    target.display(),
-                    source.display()
-                ),
-            ])
-            .output()?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(TwinError::symlink(
-                format!("Junction creation failed: {}", stderr),
-                Some(target.to_path_buf()),
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// ハードリンクを作成（ファイル用、管理者権限不要）
-    fn create_hardlink(&self, source: &Path, target: &Path) -> TwinResult<()> {
-        let output = Command::new("cmd")
-            .args(&[
-                "/c",
-                &format!(
-                    "mklink /H \"{}\" \"{}\"",
-                    target.display(),
-                    source.display()
-                ),
-            ])
-            .output()?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(TwinError::symlink(
-                format!("Hardlink creation failed: {}", stderr),
                 Some(target.to_path_buf()),
             ));
         }
@@ -319,9 +275,19 @@ impl SymlinkManager for WindowsSymlinkManager {
         let strategy = self.select_strategy(source, target);
 
         let result = match strategy {
-            LinkStrategy::Symlink => self.execute_mklink(source, target, source.is_dir()),
+            LinkStrategy::Symlink => {
+                // 開発者モードが無効な場合、エラーメッセージを表示
+                if !self.developer_mode && !self.is_elevated {
+                    eprintln!(
+                        "⚠️  Warning: Symbolic link creation requires Developer Mode or Administrator privileges"
+                    );
+                    eprintln!("⚠️  Falling back to file copy instead");
+                    self.copy_file(source, target)
+                } else {
+                    self.execute_mklink(source, target, source.is_dir())
+                }
+            }
             LinkStrategy::Copy => self.copy_file(source, target),
-            _ => unreachable!(),
         };
 
         let mut info = SymlinkInfo::new(source.to_path_buf(), target.to_path_buf());
@@ -410,18 +376,6 @@ impl SymlinkManager for WindowsSymlinkManager {
             format!("mklink \"{}\" \"{}\"", target.display(), source.display())
         }
     }
-}
-
-/// ドライブレターを取得（Windows用）
-#[cfg(windows)]
-fn get_drive_letter(path: &Path) -> Option<String> {
-    path.to_str().and_then(|s| {
-        if s.len() >= 2 && s.chars().nth(1) == Some(':') {
-            Some(s[0..2].to_string())
-        } else {
-            None
-        }
-    })
 }
 
 /// ファクトリ関数

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Git操作モジュール
 ///
 /// このモジュールの役割：
@@ -159,9 +160,9 @@ impl GitManager {
         let mut args = vec!["worktree", "add"];
 
         // 新しいブランチを作成する場合
-        if create_branch && branch.is_some() {
+        if create_branch && let Some(b) = branch {
             args.push("-b");
-            args.push(branch.unwrap());
+            args.push(b);
         }
 
         // パスを追加
@@ -169,8 +170,8 @@ impl GitManager {
         args.push(&path_str);
 
         // 既存のブランチを指定する場合
-        if !create_branch && branch.is_some() {
-            args.push(branch.unwrap());
+        if !create_branch && let Some(b) = branch {
+            args.push(b);
         }
 
         let output = self.execute_git_command(&args)?;
@@ -221,7 +222,7 @@ impl GitManager {
                 }
 
                 // 新しいworktree情報を開始
-                let path = PathBuf::from(&line[9..]);
+                let path = PathBuf::from(line.strip_prefix("worktree ").unwrap());
                 current_worktree = Some(WorktreeInfo {
                     path,
                     branch: String::new(),
@@ -234,9 +235,9 @@ impl GitManager {
                 });
             } else if let Some(ref mut wt) = current_worktree {
                 if line.starts_with("HEAD ") {
-                    wt.commit = line[5..].to_string();
+                    wt.commit = line.strip_prefix("HEAD ").unwrap().to_string();
                 } else if line.starts_with("branch ") {
-                    wt.branch = line[7..].to_string();
+                    wt.branch = line.strip_prefix("branch ").unwrap().to_string();
                     // エージェント名を抽出（例: agent/claude -> claude）
                     if wt.branch.starts_with("agent/") {
                         wt.agent_name = Some(wt.branch[6..].to_string());
@@ -280,8 +281,8 @@ impl GitManager {
                 wt.path == path ||
                 wt.path == abs_path ||
                 // 正規化されたパスとの比較
-                canonical_path.as_ref().map_or(false, |cp| {
-                    wt.path.canonicalize().ok().map_or(false, |wtp| wtp == *cp)
+                canonical_path.as_ref().is_some_and(|cp| {
+                    wt.path.canonicalize().ok().is_some_and(|wtp| wtp == *cp)
                 }) ||
                 // ファイル名だけでも一致を確認（最後の手段）
                 wt.path.file_name() == path.file_name() && path.file_name().is_some()
@@ -305,7 +306,7 @@ impl GitManager {
             .lines()
             .filter_map(|line| {
                 if line.contains("Removing worktrees") {
-                    Some(PathBuf::from(line.split(':').last()?.trim()))
+                    Some(PathBuf::from(line.rsplit(":").next()?.trim()))
                 } else {
                     None
                 }
@@ -633,6 +634,7 @@ alias twr='twin remove'
 }
 
 /// サポートされているシェルタイプ
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShellType {
     Bash,

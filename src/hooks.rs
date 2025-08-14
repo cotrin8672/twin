@@ -1,10 +1,12 @@
-/// フック実行システムモジュール
-///
-/// このモジュールの役割：
-/// - pre_create/post_create/pre_remove/post_remove フックの実行
-/// - フック実行時のエラーハンドリングと継続/中断制御
-/// - フック実行ログの表示
-/// - 環境変数の設定と引数の展開
+//! フック実行システムモジュール
+//!
+//! このモジュールの役割：
+//! - pre_create/post_create/pre_remove/post_remove フックの実行
+//! - フック実行時のエラーハンドリングと継続/中断制御
+//! - フック実行ログの表示
+//! - 環境変数の設定と引数の展開
+
+#![allow(dead_code)]
 use crate::core::{HookCommand, TwinError, TwinResult};
 use log::{debug, error, info, warn};
 use std::collections::HashMap;

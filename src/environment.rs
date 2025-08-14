@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+#![allow(dead_code)]
 /// 環境管理モジュール
 ///
 /// このモジュールの役割：

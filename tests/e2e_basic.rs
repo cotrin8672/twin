@@ -18,20 +18,20 @@ fn setup_git_repo() -> TempDir {
 
     // Git初期化
     Command::new("git")
-        .args(&["init"])
+        .args(["init"])
         .current_dir(dir.path())
         .output()
         .expect("git init failed");
 
     // Git設定
     Command::new("git")
-        .args(&["config", "user.email", "test@example.com"])
+        .args(["config", "user.email", "test@example.com"])
         .current_dir(dir.path())
         .output()
         .unwrap();
 
     Command::new("git")
-        .args(&["config", "user.name", "Test User"])
+        .args(["config", "user.name", "Test User"])
         .current_dir(dir.path())
         .output()
         .unwrap();
@@ -40,13 +40,13 @@ fn setup_git_repo() -> TempDir {
     std::fs::write(dir.path().join("README.md"), "# Test").unwrap();
 
     Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(dir.path())
         .output()
         .unwrap();
 
     Command::new("git")
-        .args(&["commit", "-m", "initial"])
+        .args(["commit", "-m", "initial"])
         .current_dir(dir.path())
         .output()
         .unwrap();
@@ -78,7 +78,7 @@ fn test_create_environment() {
 
     // 環境を作成
     let output = Command::new(&twin)
-        .args(&["create", "test-env"])
+        .args(["create", "test-env"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to run twin create");
@@ -97,7 +97,7 @@ fn test_create_environment() {
 
     // Git worktreeが作成されたか確認
     let worktree_output = Command::new("git")
-        .args(&["worktree", "list"])
+        .args(["worktree", "list"])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -119,14 +119,14 @@ fn test_list_environments() {
 
     // まず環境を作成
     Command::new(&twin)
-        .args(&["create", "list-test"])
+        .args(["create", "list-test"])
         .current_dir(repo.path())
         .output()
         .unwrap();
 
     // リストコマンドを実行
     let output = Command::new(&twin)
-        .args(&["list"])
+        .args(["list"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to run twin list");
@@ -146,14 +146,14 @@ fn test_remove_environment() {
 
     // 環境を作成
     Command::new(&twin)
-        .args(&["create", "remove-test"])
+        .args(["create", "remove-test"])
         .current_dir(repo.path())
         .output()
         .unwrap();
 
     // 環境を削除（--forceで確認をスキップ）
     let output = Command::new(&twin)
-        .args(&["remove", "remove-test", "--force"])
+        .args(["remove", "remove-test", "--force"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to run twin remove");
@@ -197,7 +197,7 @@ description = "Configuration file"
 
     // 設定ファイルを指定して環境を作成
     let output = Command::new(&twin)
-        .args(&["create", "config-test", "--config", ".twin.toml"])
+        .args(["create", "config-test", "--config", ".twin.toml"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create with config");
@@ -234,7 +234,7 @@ path = "test.txt"
 
     // 最小限の設定で環境作成
     let output = Command::new(&twin)
-        .args(&["create", "minimal-test", "--config", "minimal.toml"])
+        .args(["create", "minimal-test", "--config", "minimal.toml"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create with minimal config");
@@ -254,7 +254,7 @@ post_create = [{command = "echo 'Created!'"}]
 
     // hooksだけの設定で環境作成
     let output = Command::new(&twin)
-        .args(&["create", "hooks-test", "--config", "hooks.toml"])
+        .args(["create", "hooks-test", "--config", "hooks.toml"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create with hooks config");
@@ -292,7 +292,7 @@ path = "dummy.txt"
 
     // 環境作成（フック実行）
     let output = Command::new(&twin)
-        .args(&["create", "hook-env", "--config", "hook-test.toml"])
+        .args(["create", "hook-env", "--config", "hook-test.toml"])
         .env("TWIN_VERBOSE", "1") // Verboseモードでフック実行を確認
         .current_dir(repo.path())
         .output()
@@ -318,7 +318,7 @@ fn test_json_output_format() {
 
     // JSON形式でリスト表示
     let output = Command::new(&twin)
-        .args(&["list", "--format", "json"])
+        .args(["list", "--format", "json"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to list with JSON format");
@@ -343,7 +343,7 @@ fn test_verbose_logging() {
 
     // TWIN_VERBOSE環境変数を設定して実行
     let output = Command::new(&twin)
-        .args(&["create", "verbose-test"])
+        .args(["create", "verbose-test"])
         .env("TWIN_VERBOSE", "1")
         .current_dir(repo.path())
         .output()
@@ -366,14 +366,14 @@ fn test_branch_naming() {
 
     // デフォルトブランチ名で作成
     Command::new(&twin)
-        .args(&["create", "branch-test"])
+        .args(["create", "branch-test"])
         .current_dir(repo.path())
         .output()
         .unwrap();
 
     // ブランチ一覧を確認
     let output = Command::new("git")
-        .args(&["branch", "-a"])
+        .args(["branch", "-a"])
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -395,7 +395,7 @@ fn test_custom_branch_name() {
 
     // カスタムブランチ名で作成
     let output = Command::new(&twin)
-        .args(&["create", "custom", "--branch", "feature/my-branch"])
+        .args(["create", "custom", "--branch", "feature/my-branch"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create with custom branch");
@@ -405,7 +405,7 @@ fn test_custom_branch_name() {
 
     // ブランチを確認
     let branch_output = Command::new("git")
-        .args(&["branch", "-a"])
+        .args(["branch", "-a"])
         .current_dir(repo.path())
         .output()
         .unwrap();

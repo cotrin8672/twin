@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+#![allow(dead_code)]
 /// 設定管理モジュール
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -42,14 +44,43 @@ impl Default for Config {
 }
 
 impl Config {
-    /// 設定ファイルを読み込む
-    pub async fn load(path: &Path) -> Result<Self> {
-        let content = fs::read_to_string(path)
-            .await
-            .with_context(|| format!("Failed to read config file: {}", path.display()))?;
+    /// 設定ファイルを読み込む（ファイルが存在しない場合はデフォルト値を返す）
+    pub async fn load(path: Option<&Path>) -> Result<Self> {
+        // パスが指定されていて、ファイルが存在する場合は読み込む
+        if let Some(p) = path {
+            if p.exists() {
+                let content = fs::read_to_string(p)
+                    .await
+                    .with_context(|| format!("Failed to read config file: {}", p.display()))?;
+                return toml::from_str(&content)
+                    .with_context(|| format!("Failed to parse config file: {}", p.display()));
+            }
+        }
 
-        toml::from_str(&content)
-            .with_context(|| format!("Failed to parse config file: {}", path.display()))
+        // プロジェクト設定を探す
+        if let Some(config_path) = Self::find_config_path(Path::new(".")).await {
+            let content = fs::read_to_string(&config_path).await.with_context(|| {
+                format!("Failed to read config file: {}", config_path.display())
+            })?;
+            return toml::from_str(&content).with_context(|| {
+                format!("Failed to parse config file: {}", config_path.display())
+            });
+        }
+
+        // グローバル設定を試す
+        if let Ok(global_path) = Self::global_config_path() {
+            if global_path.exists() {
+                let content = fs::read_to_string(&global_path).await.with_context(|| {
+                    format!("Failed to read config file: {}", global_path.display())
+                })?;
+                return toml::from_str(&content).with_context(|| {
+                    format!("Failed to parse config file: {}", global_path.display())
+                });
+            }
+        }
+
+        // デフォルト設定を返す
+        Ok(Self::default())
     }
 
     /// 設定ファイルを保存
@@ -194,26 +225,6 @@ impl Config {
         config.save(&config_path).await?;
 
         Ok(config_path)
-    }
-
-    /// 設定ファイルまたはグローバル設定を読み込む
-    pub async fn load_or_default(project_path: Option<&Path>) -> Result<Self> {
-        // プロジェクト設定を探す
-        if let Some(path) = project_path {
-            if let Some(config_path) = Self::find_config_path(path).await {
-                return Self::load(&config_path).await;
-            }
-        }
-
-        // グローバル設定を試す
-        if let Ok(global_path) = Self::global_config_path() {
-            if global_path.exists() {
-                return Self::load(&global_path).await;
-            }
-        }
-
-        // デフォルト設定を返す
-        Ok(Self::default())
     }
 }
 

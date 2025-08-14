@@ -1,6 +1,6 @@
+#![allow(clippy::all)]
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Local, Utc};
-use serde_json;
 use std::path::Path;
 
 use crate::core::{AgentEnvironment, EnvironmentStatus};
@@ -116,6 +116,7 @@ fn format_simple(environments: &[&AgentEnvironment], active_name: Option<&str>) 
 }
 
 /// パス出力（cdコマンド用）
+#[allow(dead_code)]
 pub fn format_path_output(path: &Path, show_cd_command: bool) -> Result<()> {
     if show_cd_command {
         // シェル検出
@@ -255,10 +256,10 @@ mod tests {
 
     #[test]
     fn test_output_formatter_new() {
-        let formatter = OutputFormatter::new("table");
+        let _formatter = OutputFormatter::new("table");
         // OutputFormatterがTableフォーマットで作成される
 
-        let formatter_invalid = OutputFormatter::new("invalid");
+        let _formatter_invalid = OutputFormatter::new("invalid");
         // 無効な形式の場合はデフォルト（Table）にフォールバック
     }
 

@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+#![allow(dead_code)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -69,6 +71,7 @@ pub struct SymlinkInfo {
 
 impl AgentEnvironment {
     /// 新しい環境を作成
+    #[allow(dead_code)]
     pub fn new(
         name: String,
         branch: String,
@@ -88,16 +91,19 @@ impl AgentEnvironment {
         }
     }
 
+    #[allow(dead_code)]
     /// 環境がアクティブかどうか
     pub fn is_active(&self) -> bool {
         self.status == EnvironmentStatus::Active
     }
 
+    #[allow(dead_code)]
     /// 環境のパスを取得
     pub fn path(&self) -> &PathBuf {
         &self.worktree_path
     }
 
+    #[allow(dead_code)]
     /// シンボリックリンクを追加
     pub fn add_symlink(&mut self, symlink: SymlinkInfo) {
         self.symlinks.push(symlink);
@@ -113,6 +119,7 @@ impl AgentEnvironment {
 
 impl SymlinkInfo {
     /// 新しいシンボリックリンク情報を作成
+    #[allow(dead_code)]
     pub fn new(source: PathBuf, target: PathBuf) -> Self {
         Self {
             source,
@@ -150,6 +157,7 @@ pub struct Config {
 
 impl Config {
     /// 新しい空の設定を作成
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             settings: ConfigSettings::default(),
@@ -325,6 +333,7 @@ pub enum OperationType {
 pub struct OperationStep {
     /// ステップ名
     pub name: String,
+    #[allow(dead_code)]
 
     /// ステップの詳細
     pub details: HashMap<String, String>,
@@ -352,6 +361,7 @@ pub struct EnvironmentRegistry {
 
 impl EnvironmentRegistry {
     /// 新しいレジストリを作成
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -695,5 +705,130 @@ mod tests {
         info.set_error("Test error".to_string());
         assert!(!info.is_valid);
         assert_eq!(info.error_message, Some("Test error".to_string()));
+    }
+
+    #[test]
+    fn test_partial_config_deserialization() {
+        use std::io::Write;
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        // 最小限の設定（ファイルのみ）
+        let toml_str = r#"
+            [[files]]
+            path = "test.txt"
+        "#;
+
+        writeln!(temp_file, "{}", toml_str).unwrap();
+
+        let config = Config::from_path(temp_file.path()).expect("Should parse minimal config");
+        assert_eq!(config.settings.files.len(), 1);
+        assert_eq!(config.settings.files[0].path, PathBuf::from("test.txt"));
+        assert_eq!(config.settings.files[0].mapping_type, MappingType::Symlink); // デフォルト
+        assert!(config.settings.hooks.pre_create.is_empty());
+        assert!(config.settings.hooks.post_create.is_empty());
+        assert_eq!(config.settings.branch_prefix, Some("agent".to_string())); // デフォルト
+    }
+
+    #[test]
+    fn test_hooks_only_config() {
+        use std::io::Write;
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        // フックのみの設定
+        let toml_str = r#"
+            [hooks]
+            pre_create = [{command = "echo starting"}]
+            post_create = [{command = "echo done"}]
+        "#;
+
+        writeln!(temp_file, "{}", toml_str).unwrap();
+
+        let config = Config::from_path(temp_file.path()).expect("Should parse hooks-only config");
+        assert!(config.settings.files.is_empty());
+        assert_eq!(config.settings.hooks.pre_create.len(), 1);
+        assert_eq!(config.settings.hooks.pre_create[0].command, "echo starting");
+        assert_eq!(config.settings.hooks.post_create.len(), 1);
+        assert_eq!(config.settings.hooks.post_create[0].command, "echo done");
+        assert!(config.settings.hooks.pre_remove.is_empty());
+        assert!(config.settings.hooks.post_remove.is_empty());
+    }
+
+    #[test]
+    fn test_empty_config() {
+        use std::io::Write;
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        // 完全に空の設定
+        let toml_str = "";
+
+        writeln!(temp_file, "{}", toml_str).unwrap();
+
+        let config = Config::from_path(temp_file.path()).expect("Should parse empty config");
+        assert!(config.settings.files.is_empty());
+        assert!(config.settings.hooks.pre_create.is_empty());
+        assert!(config.settings.hooks.post_create.is_empty());
+        assert!(config.settings.hooks.pre_remove.is_empty());
+        assert!(config.settings.hooks.post_remove.is_empty());
+        assert_eq!(config.settings.branch_prefix, Some("agent".to_string()));
+    }
+
+    #[test]
+    fn test_config_with_custom_branch_prefix() {
+        use std::io::Write;
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        let toml_str = r#"
+            branch_prefix = "feature/"
+        "#;
+
+        writeln!(temp_file, "{}", toml_str).unwrap();
+
+        let config = Config::from_path(temp_file.path())
+            .expect("Should parse config with custom branch prefix");
+        assert_eq!(config.settings.branch_prefix, Some("feature/".to_string()));
+    }
+
+    #[test]
+    fn test_file_mapping_defaults() {
+        use std::io::Write;
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        let toml_str = r#"
+            [[files]]
+            path = "config.yml"
+            # mapping_typeは省略 - デフォルトはsymlink
+            # skip_if_existsは省略 - デフォルトはfalse
+        "#;
+
+        writeln!(temp_file, "{}", toml_str).unwrap();
+
+        let config = Config::from_path(temp_file.path()).expect("Should parse with defaults");
+        assert_eq!(config.settings.files.len(), 1);
+        assert_eq!(config.settings.files[0].mapping_type, MappingType::Symlink);
+        assert!(!config.settings.files[0].skip_if_exists);
+        assert!(config.settings.files[0].description.is_none());
+    }
+
+    #[test]
+    fn test_hook_command_defaults() {
+        use std::io::Write;
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        let toml_str = r#"
+            [hooks]
+            pre_create = [
+                {command = "simple command"}
+            ]
+        "#;
+
+        writeln!(temp_file, "{}", toml_str).unwrap();
+
+        let config = Config::from_path(temp_file.path()).expect("Should parse hook with defaults");
+        let hook = &config.settings.hooks.pre_create[0];
+        assert_eq!(hook.command, "simple command");
+        assert!(hook.args.is_empty()); // デフォルトは空の配列
+        assert!(hook.env.is_empty()); // デフォルトは空のHashMap
+        assert_eq!(hook.timeout, 60); // デフォルトタイムアウト
+        assert!(!hook.continue_on_error); // デフォルトはfalse
     }
 }

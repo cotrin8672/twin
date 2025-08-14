@@ -1,0 +1,79 @@
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -1,3 +1,4 @@
++#![allow(dead_code)]
+ /// 設定管理モジュール
+ use anyhow::{Context, Result};
+ use serde::{Deserialize, Serialize};
+@@ -280,8 +281,8 @@ impl GitManager {
+                 // 正規化されたパスで比較
+                 let canonical_path = base_path.canonicalize().ok();
+-                canonical_path.as_ref().map_or(false, |cp| {
+-                    wt.path.canonicalize().ok().map_or(false, |wtp| wtp == *cp)
++                canonical_path.as_ref().is_some_and(|cp| {
++                    wt.path.canonicalize().ok().is_some_and(|wtp| wtp == *cp)
+                 })
+             })
+             .unwrap_or(false);
+@@ -305,7 +306,7 @@ impl GitManager {
+                 .lines()
+                 .filter_map(|line| {
+                     // パスを抽出（フォーマット: hash<TAB>path）
+-                    Some(PathBuf::from(line.split(':').last()?.trim()))
++                    Some(PathBuf::from(line.split(':').next_back()?.trim()))
+                 })
+                 .collect()
+         } else {
+@@ -177,7 +177,7 @@ fn check_developer_mode() -> bool {
+         .output()
+         .is_ok_and(|output| output.status.success());
+ 
+-            .args(&[
++            .args([
+                 "query",
+                 "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock",
+                 "/v",
+                 "AllowDevelopmentWithoutDevLicense",
+-            ])
++            ])
+         .output()
+         .is_ok_and(|output| {
+             output.status.success()
+@@ -197,7 +197,7 @@ fn check_token_elevation() -> bool {
+     Command::new("powershell")
+         .args(&["-Command", "(whoami /groups | Select-String 'S-1-16-12288') -ne $null"])
+             .args(&["session"])
+             .args(["session"])
+         .output()
+         .is_ok_and(|output| output.status.success() && output.stdout.starts_with(b"True"))
+ }
+@@ -236,7 +236,7 @@ fn create_junction_windows(source: &Path, target: &Path) -> std::io::Result<()>
+         Command::new("cmd")
+-            .args(&[
++            .args([
+                 "/c",
+                 &format!(
+                     "mklink /J \"{}\" \"{}\"",
+                     target.display(),
+                     source.display()
+                 ),
+-            ])
++            ])
+             .output()
+     };
+ 
+@@ -260,7 +260,7 @@ fn create_hardlink_windows(source: &Path, target: &Path) -> std::io::Result<()>
+         Command::new("cmd")
+-            .args(&[
++            .args([
+                 "/c",
+                 &format!(
+                     "mklink /H \"{}\" \"{}\"",
+                     target.display(),
+                     source.display()
+                 ),
+-            ])
++            ])
+             .output()
+     };
+ 

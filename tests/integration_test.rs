@@ -12,7 +12,7 @@ fn setup_test_repo() -> TempDir {
 
     // Git初期化
     let output = Command::new("git")
-        .args(&["init"])
+        .args(["init"])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to init git");
@@ -23,25 +23,25 @@ fn setup_test_repo() -> TempDir {
     std::fs::write(temp_dir.path().join("README.md"), "# Test Repo").unwrap();
 
     Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to add files");
 
     Command::new("git")
-        .args(&["config", "user.email", "test@example.com"])
+        .args(["config", "user.email", "test@example.com"])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to set email");
 
     Command::new("git")
-        .args(&["config", "user.name", "Test User"])
+        .args(["config", "user.name", "Test User"])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to set name");
 
     Command::new("git")
-        .args(&["commit", "-m", "Initial commit"])
+        .args(["commit", "-m", "Initial commit"])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to commit");
@@ -98,7 +98,7 @@ fn test_create_and_remove_environment() {
 
     // 環境を作成
     let output = Command::new(&twin)
-        .args(&["create", "test-agent"])
+        .args(["create", "test-agent"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create environment");
@@ -115,7 +115,7 @@ fn test_create_and_remove_environment() {
     // worktreeが作成されたか確認
     // Git worktree listで確認
     let worktree_list_output = Command::new("git")
-        .args(&["worktree", "list"])
+        .args(["worktree", "list"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to list worktrees");
@@ -132,7 +132,7 @@ fn test_create_and_remove_environment() {
 
     // 環境をリスト表示
     let output = Command::new(&twin)
-        .args(&["list"])
+        .args(["list"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to list environments");
@@ -143,7 +143,7 @@ fn test_create_and_remove_environment() {
 
     // 環境を削除
     let output = Command::new(&twin)
-        .args(&["remove", "test-agent", "--force"])
+        .args(["remove", "test-agent", "--force"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to remove environment");
@@ -166,7 +166,7 @@ fn test_list_empty() {
 
     // 空の状態でリスト表示
     let output = Command::new(&twin)
-        .args(&["list"])
+        .args(["list"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to list environments");
@@ -182,7 +182,7 @@ fn test_list_with_format() {
 
     // JSON形式でリスト表示
     let output = Command::new(&twin)
-        .args(&["list", "--format", "json"])
+        .args(["list", "--format", "json"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to list with json format");
@@ -200,7 +200,7 @@ fn test_config_show() {
 
     // 設定を表示
     let output = Command::new(&twin)
-        .args(&["config", "--show"])
+        .args(["config", "--show"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to show config");
@@ -253,7 +253,7 @@ fn test_symlink_creation_windows() {
         use std::os::windows::fs::symlink_file;
 
         // 開発者モードでない場合はスキップ
-        if let Err(_) = symlink_file(&source, &target) {
+        if symlink_file(&source, &target).is_err() {
             eprintln!("Skipping symlink test - requires developer mode or admin rights");
             return;
         }
@@ -271,7 +271,7 @@ fn test_create_with_custom_branch() {
 
     // カスタムブランチ名で環境を作成
     let output = Command::new(&twin)
-        .args(&["create", "custom-agent", "--branch", "feature/custom"])
+        .args(["create", "custom-agent", "--branch", "feature/custom"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create with custom branch");
@@ -279,7 +279,7 @@ fn test_create_with_custom_branch() {
     if output.status.success() {
         // ブランチが作成されたか確認
         let output = Command::new("git")
-            .args(&["branch", "--list"])
+            .args(["branch", "--list"])
             .current_dir(repo.path())
             .output()
             .expect("Failed to list branches");
@@ -289,7 +289,7 @@ fn test_create_with_custom_branch() {
 
         // クリーンアップ
         Command::new(&twin)
-            .args(&["remove", "custom-agent", "--force"])
+            .args(["remove", "custom-agent", "--force"])
             .current_dir(repo.path())
             .output()
             .ok();
