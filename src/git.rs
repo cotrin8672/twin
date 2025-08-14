@@ -261,9 +261,31 @@ impl GitManager {
     pub fn get_worktree_info(&mut self, path: &Path) -> TwinResult<WorktreeInfo> {
         let worktrees = self.list_worktrees()?;
 
+        // パスを絶対パスに変換して比較
+        let abs_path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .map_err(|e| TwinError::io(format!("Failed to get current dir: {}", e), None))?
+                .join(path)
+        };
+
+        // 正規化されたパスでも検索を試みる
+        let canonical_path = abs_path.canonicalize().ok();
+
         worktrees
             .into_iter()
-            .find(|wt| wt.path == path)
+            .find(|wt| {
+                // 直接比較
+                wt.path == path ||
+                wt.path == abs_path ||
+                // 正規化されたパスとの比較
+                canonical_path.as_ref().map_or(false, |cp| {
+                    wt.path.canonicalize().ok().map_or(false, |wtp| wtp == *cp)
+                }) ||
+                // ファイル名だけでも一致を確認（最後の手段）
+                wt.path.file_name() == path.file_name() && path.file_name().is_some()
+            })
             .ok_or_else(|| TwinError::not_found("Worktree", path.to_string_lossy().to_string()))
     }
 
