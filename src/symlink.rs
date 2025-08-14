@@ -64,10 +64,13 @@ impl SymlinkManager for UnixSymlinkManager {
     fn create_symlink(&self, source: &Path, target: &Path) -> TwinResult<SymlinkInfo> {
         // 透明性のあるコマンド実行ログ
         if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
-            eprintln!("🔗 シンボリックリンク作成: {} -> {}", 
-                target.display(), source.display());
+            eprintln!(
+                "🔗 シンボリックリンク作成: {} -> {}",
+                target.display(),
+                source.display()
+            );
         }
-        
+
         // 既存のリンクやファイルがある場合は削除
         if target.exists() || target.is_symlink() {
             fs::remove_file(target).ok();
@@ -84,7 +87,8 @@ impl SymlinkManager for UnixSymlinkManager {
             use std::os::unix::fs::symlink;
             match symlink(source, target) {
                 Ok(_) => {
-                    if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
+                    if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok()
+                    {
                         eprintln!("✅ シンボリックリンク作成成功");
                     }
                     let mut info = SymlinkInfo::new(source.to_path_buf(), target.to_path_buf());
@@ -92,7 +96,8 @@ impl SymlinkManager for UnixSymlinkManager {
                     Ok(info)
                 }
                 Err(e) => {
-                    if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
+                    if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok()
+                    {
                         eprintln!("❌ シンボリックリンク作成失敗: {}", e);
                     }
                     let mut info = SymlinkInfo::new(source.to_path_buf(), target.to_path_buf());
@@ -110,7 +115,7 @@ impl SymlinkManager for UnixSymlinkManager {
         if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
             eprintln!("🗑️  シンボリックリンク削除: {}", path.display());
         }
-        
+
         if path.is_symlink() {
             fs::remove_file(path)?;
             if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
@@ -293,10 +298,13 @@ impl SymlinkManager for WindowsSymlinkManager {
     fn create_symlink(&self, source: &Path, target: &Path) -> TwinResult<SymlinkInfo> {
         // 透明性のあるコマンド実行ログ
         if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
-            eprintln!("🔗 シンボリックリンク作成: {} -> {}", 
-                target.display(), source.display());
+            eprintln!(
+                "🔗 シンボリックリンク作成: {} -> {}",
+                target.display(),
+                source.display()
+            );
         }
-        
+
         // 既存のファイルを削除
         if target.exists() {
             fs::remove_file(target).ok();
@@ -340,7 +348,7 @@ impl SymlinkManager for WindowsSymlinkManager {
         if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
             eprintln!("🗑️  シンボリックリンク削除: {}", path.display());
         }
-        
+
         if path.exists() {
             let metadata = fs::symlink_metadata(path)?;
             if metadata.is_dir() {

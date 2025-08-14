@@ -18,13 +18,26 @@ use crate::cli::{Cli, Commands};
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "twin=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // Only initialize if RUST_LOG is set or TWIN_VERBOSE/TWIN_DEBUG is set
+    if std::env::var("RUST_LOG").is_ok()
+        || std::env::var("TWIN_VERBOSE").is_ok()
+        || std::env::var("TWIN_DEBUG").is_ok()
+    {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                    if std::env::var("TWIN_DEBUG").is_ok() {
+                        "twin=debug".into()
+                    } else if std::env::var("TWIN_VERBOSE").is_ok() {
+                        "twin=info".into()
+                    } else {
+                        "twin=warn".into()
+                    }
+                }),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
 
     // Parse CLI arguments
     let cli = Cli::parse();

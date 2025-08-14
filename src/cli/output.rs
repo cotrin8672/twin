@@ -15,7 +15,7 @@ impl OutputFormatter {
         let format = OutputFormat::from_str(format_str).unwrap_or(OutputFormat::Table);
         Self { format }
     }
-    
+
     pub fn format_environments(&self, environments: &[AgentEnvironment]) -> Result<()> {
         let env_refs: Vec<&AgentEnvironment> = environments.iter().collect();
         format_environments(&env_refs, &self.format, None)
@@ -215,7 +215,7 @@ mod tests {
     fn test_format_table_empty() {
         let environments: Vec<&AgentEnvironment> = vec![];
         let result = format_table(&environments, None);
-        
+
         assert!(result.is_ok());
         // 空の時は "No environments found." が出力される
     }
@@ -224,7 +224,7 @@ mod tests {
     fn test_format_json_empty() {
         let environments: Vec<&AgentEnvironment> = vec![];
         let result = format_json(&environments);
-        
+
         assert!(result.is_ok());
         // JSON形式では空配列 [] が出力される
     }
@@ -233,7 +233,7 @@ mod tests {
     fn test_format_simple_empty() {
         let environments: Vec<&AgentEnvironment> = vec![];
         let result = format_simple(&environments, None);
-        
+
         assert!(result.is_ok());
         // シンプル形式では何も出力されない
     }
@@ -241,11 +241,11 @@ mod tests {
     #[test]
     fn test_format_datetime_formatting() {
         use chrono::{TimeZone, Utc};
-        
+
         // 2024年1月15日 14:30:00 UTC
         let dt = Utc.with_ymd_and_hms(2024, 1, 15, 14, 30, 0).unwrap();
         let formatted = format_datetime(&dt);
-        
+
         // フォーマットは "MM/DD HH:MM" 形式
         // ローカルタイムゾーンに依存するため、形式のみチェック
         assert!(formatted.contains("/"));
@@ -257,7 +257,7 @@ mod tests {
     fn test_output_formatter_new() {
         let formatter = OutputFormatter::new("table");
         // OutputFormatterがTableフォーマットで作成される
-        
+
         let formatter_invalid = OutputFormatter::new("invalid");
         // 無効な形式の場合はデフォルト（Table）にフォールバック
     }
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn test_format_environments_with_data() {
         use chrono::Utc;
-        
+
         let env1 = AgentEnvironment {
             name: "test1".to_string(),
             branch: "feature/test1".to_string(),
@@ -276,7 +276,7 @@ mod tests {
             updated_at: Utc::now(),
             config_path: None,
         };
-        
+
         let env2 = AgentEnvironment {
             name: "test2".to_string(),
             branch: "feature/test2".to_string(),
@@ -287,17 +287,17 @@ mod tests {
             updated_at: Utc::now(),
             config_path: None,
         };
-        
+
         let environments = vec![&env1, &env2];
-        
+
         // Table形式
         let result_table = format_table(&environments, Some("test1"));
         assert!(result_table.is_ok());
-        
+
         // JSON形式
         let result_json = format_json(&environments);
         assert!(result_json.is_ok());
-        
+
         // Simple形式
         let result_simple = format_simple(&environments, Some("test1"));
         assert!(result_simple.is_ok());

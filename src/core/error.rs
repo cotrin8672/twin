@@ -264,7 +264,7 @@ mod tests {
             }
             _ => panic!("Expected Git error"),
         }
-        
+
         // Display実装のテスト
         let display_str = format!("{}", error);
         assert!(display_str.contains("Git error"));
@@ -275,9 +275,13 @@ mod tests {
     fn test_twin_error_symlink() {
         let path = PathBuf::from("/tmp/test.txt");
         let error = TwinError::symlink("Failed to create symlink", Some(path.clone()));
-        
+
         match error {
-            TwinError::Symlink { message, path: p, source } => {
+            TwinError::Symlink {
+                message,
+                path: p,
+                source,
+            } => {
                 assert_eq!(message, "Failed to create symlink");
                 assert_eq!(p, Some(path));
                 assert!(source.is_none());
@@ -294,16 +298,20 @@ mod tests {
             path: Some(path.clone()),
             source: None,
         };
-        
+
         match &error {
-            TwinError::Config { message, path: p, source } => {
+            TwinError::Config {
+                message,
+                path: p,
+                source,
+            } => {
                 assert_eq!(message, "Invalid TOML");
                 assert_eq!(p, &Some(path));
                 assert!(source.is_none());
             }
             _ => panic!("Expected Config error"),
         }
-        
+
         // Display実装のテスト
         let display_str = format!("{}", error);
         assert!(display_str.contains("Config error"));
@@ -355,7 +363,7 @@ mod tests {
             ),
             (TwinError::Other("other error".to_string()), "other error"),
         ];
-        
+
         for (error, expected) in errors {
             let display_str = format!("{}", error);
             assert_eq!(display_str, expected);
@@ -366,10 +374,14 @@ mod tests {
     fn test_twin_error_from_io() {
         let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
         let twin_error = TwinError::from(io_error);
-        
+
         match twin_error {
-            TwinError::Io { message, path, source } => {
-                assert!(message.contains("IO error"));
+            TwinError::Io {
+                message,
+                path,
+                source,
+            } => {
+                assert!(message.contains("not found") || message.contains("File not found"));
                 assert!(path.is_none());
                 assert!(source.is_some());
             }

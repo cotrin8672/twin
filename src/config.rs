@@ -8,7 +8,7 @@ use tokio::fs;
 use crate::core::{FileMapping, HookCommand, HookConfig, MappingType};
 
 /// アプリケーション全体の設定
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Git管理外ファイルのマッピング設定
     #[serde(default)]
@@ -28,6 +28,17 @@ pub struct Config {
 
 fn default_branch_prefix() -> String {
     "agent/".to_string()
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            files: Vec::new(),
+            hooks: HookConfig::default(),
+            worktree_base: None,
+            branch_prefix: default_branch_prefix(),
+        }
+    }
 }
 
 impl Config {

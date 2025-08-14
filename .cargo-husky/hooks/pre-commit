@@ -1,0 +1,49 @@
+#!/bin/sh
+set -e
+
+echo "🚀 Running pre-commit checks..."
+echo ""
+
+# 1. フォーマットチェック
+echo "📝 Checking code formatting..."
+if ! cargo fmt -- --check; then
+    echo ""
+    echo "❌ Code is not properly formatted!"
+    echo "💡 Run 'cargo fmt' to fix formatting issues"
+    exit 1
+fi
+echo "✅ Format check passed"
+echo ""
+
+# 2. Clippy (Linter)
+echo "🔍 Running clippy linter..."
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
+    echo ""
+    echo "❌ Clippy found issues!"
+    echo "💡 Fix the warnings above before committing"
+    exit 1
+fi
+echo "✅ Clippy check passed"
+echo ""
+
+# 3. ビルドチェック
+echo "🔨 Checking if project builds..."
+if ! cargo check --all-targets; then
+    echo ""
+    echo "❌ Build check failed!"
+    exit 1
+fi
+echo "✅ Build check passed"
+echo ""
+
+# 4. 高速テスト実行（単体テストのみ）
+echo "🧪 Running unit tests..."
+if ! cargo test --lib --bins; then
+    echo ""
+    echo "❌ Some tests failed!"
+    exit 1
+fi
+echo "✅ Unit tests passed"
+echo ""
+
+echo "✨ All pre-commit checks passed successfully!"

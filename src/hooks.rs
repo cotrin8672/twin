@@ -363,7 +363,6 @@ impl Default for HookExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_hook_type_string() {

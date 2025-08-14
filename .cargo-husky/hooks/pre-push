@@ -1,0 +1,73 @@
+#!/bin/sh
+set -e
+
+echo "🚀 Running pre-push checks..."
+echo ""
+
+# 1. フォーマットチェック
+echo "📝 Verifying code formatting..."
+if ! cargo fmt -- --check; then
+    echo ""
+    echo "❌ Code is not properly formatted!"
+    echo "💡 Run 'cargo fmt' before pushing"
+    exit 1
+fi
+echo "✅ Format check passed"
+echo ""
+
+# 2. Clippy
+echo "🔍 Running comprehensive clippy analysis..."
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
+    echo ""
+    echo "❌ Clippy found issues that must be fixed!"
+    exit 1
+fi
+echo "✅ Clippy check passed"
+echo ""
+
+# 3. ビルド（リリースモード）
+echo "🔨 Building in release mode..."
+if ! cargo build --release; then
+    echo ""
+    echo "❌ Release build failed!"
+    exit 1
+fi
+echo "✅ Release build successful"
+echo ""
+
+# 4. 全テスト実行
+echo "🧪 Running all tests..."
+if ! cargo test --all-targets --all-features; then
+    echo ""
+    echo "❌ Some tests failed!"
+    exit 1
+fi
+echo "✅ All tests passed"
+echo ""
+
+# 5. ドキュメントテスト
+echo "📚 Running documentation tests..."
+if ! cargo test --doc; then
+    echo ""
+    echo "❌ Documentation tests failed!"
+    exit 1
+fi
+echo "✅ Documentation tests passed"
+echo ""
+
+# 6. セキュリティ監査（cargo-auditがインストールされている場合）
+if command -v cargo-audit >/dev/null 2>&1; then
+    echo "🔒 Running security audit..."
+    if ! cargo audit; then
+        echo ""
+        echo "⚠️  Security vulnerabilities detected!"
+        echo "💡 Run 'cargo audit fix' or update dependencies"
+        # セキュリティ警告は警告のみ（ブロックしない）
+    else
+        echo "✅ No security vulnerabilities found"
+    fi
+    echo ""
+fi
+
+echo "✨ All pre-push checks completed successfully!"
+echo "🎯 Ready to push to remote repository"
