@@ -39,12 +39,11 @@ pub enum Commands {
 /// createコマンドの引数
 #[derive(Parser)]
 pub struct CreateArgs {
-    /// エージェント名（例: agent-1, feature-x）
-    pub agent_name: String,
+    /// ブランチ名（例: feature-x, bugfix-123）
+    pub branch_name: String,
 
-    /// ブランチ名（指定しない場合はエージェント名から自動生成）
-    #[arg(short, long)]
-    pub branch: Option<String>,
+    /// Worktreeのディレクトリパス（省略時は設定またはデフォルト）
+    pub directory: Option<PathBuf>,
 
     /// 設定ファイルのパス
     #[arg(short, long)]
@@ -70,8 +69,8 @@ pub struct ListArgs {
 /// removeコマンドの引数
 #[derive(Parser)]
 pub struct RemoveArgs {
-    /// 削除するエージェント名
-    pub agent_name: String,
+    /// 削除するブランチ名
+    pub branch_name: String,
 
     /// 確認なしで強制削除
     #[arg(short, long)]

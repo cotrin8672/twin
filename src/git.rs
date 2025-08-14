@@ -402,16 +402,6 @@ impl GitManager {
         Ok(branches)
     }
 
-    /// エージェント用のブランチ名を生成
-    pub fn generate_agent_branch_name(&self, agent_name: &str, suffix: Option<&str>) -> String {
-        let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-
-        if let Some(suffix) = suffix {
-            format!("agent/{}-{}-{}", agent_name, suffix, timestamp)
-        } else {
-            format!("agent/{}-{}", agent_name, timestamp)
-        }
-    }
 
     /// ブランチが存在するか確認
     pub fn branch_exists(&mut self, branch_name: &str) -> TwinResult<bool> {
@@ -474,13 +464,6 @@ impl GitManager {
         Ok(branch)
     }
 
-    /// Worktreeのパスを生成
-    pub fn generate_worktree_path(&self, agent_name: &str) -> PathBuf {
-        self.repo_path
-            .parent()
-            .unwrap_or(&self.repo_path)
-            .join(format!("twin-{}", agent_name))
-    }
 
     /// cdコマンド文字列を生成
     pub fn generate_cd_command(&self, path: &Path) -> String {

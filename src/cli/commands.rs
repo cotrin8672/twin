@@ -11,13 +11,21 @@ pub async fn handle_create(args: CreateArgs) -> TwinResult<()> {
         Config::new()
     };
 
-    let mut manager = EnvironmentManager::new(config)?;
+    let mut manager = EnvironmentManager::new(config.clone())?;
 
-    // ブランチ名の決定
-    let branch_name = args.branch.clone();
+    // ディレクトリの決定
+    // 優先順位: 1. CLI引数 2. 設定ファイル 3. デフォルト(../branch_name)
+    let worktree_dir = if let Some(dir) = args.directory {
+        dir
+    } else if let Some(base) = &config.settings.worktree_base {
+        base.join(&args.branch_name)
+    } else {
+        // デフォルト: 親ディレクトリにブランチ名のディレクトリを作成
+        std::path::PathBuf::from("..").join(&args.branch_name)
+    };
 
     // 環境を作成
-    let env = manager.create_environment(args.agent_name.clone(), branch_name)?;
+    let env = manager.create_environment(args.branch_name.clone(), worktree_dir)?;
 
     // パス表示やcdコマンド表示の処理
     if args.print_path {
@@ -25,7 +33,7 @@ pub async fn handle_create(args: CreateArgs) -> TwinResult<()> {
     } else if args.cd_command {
         println!("cd \"{}\"", env.worktree_path.display());
     } else {
-        println!("✓ 環境 '{}' を作成しました", args.agent_name);
+        println!("✓ 環境 '{}' を作成しました", args.branch_name);
         println!("  Worktree: {}", env.worktree_path.display());
         println!("  Branch: {}", env.branch);
     }
@@ -54,7 +62,7 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
     // 確認プロンプト
     if !args.force {
         use std::io::{self, Write};
-        print!("環境 '{}' を削除しますか？ [y/N]: ", args.agent_name);
+        print!("環境 '{}' を削除しますか？ [y/N]: ", args.branch_name);
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -66,8 +74,8 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
         }
     }
 
-    manager.remove_environment(&args.agent_name, args.force)?;
-    println!("✓ 環境 '{}' を削除しました", args.agent_name);
+    manager.remove_environment(&args.branch_name, args.force)?;
+    println!("✓ 環境 '{}' を削除しました", args.branch_name);
 
     Ok(())
 }

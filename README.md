@@ -29,20 +29,20 @@ cargo install --path .
 
 #### 環境の作成
 ```bash
-# 基本的な使用方法
-twin create agent-001
+# 基本的な使用方法（デフォルト: ../ブランチ名）
+twin create feature-new
 
-# ブランチ名を指定
-twin create agent-001 --branch feature/new-feature
+# ディレクトリを指定
+twin create feature-new ../workspaces/feature
 
 # 設定ファイルを指定
-twin create agent-001 --config ./custom-config.toml
+twin create feature-new --config ./custom-config.toml
 
 # パスのみ出力（スクリプト用）
-twin create agent-001 --print-path
+twin create feature-new --print-path
 
 # cdコマンド形式で出力
-twin create agent-001 --cd-command
+twin create feature-new --cd-command
 ```
 
 #### 環境の一覧表示
@@ -60,10 +60,10 @@ twin list --format simple
 #### 環境の削除
 ```bash
 # 通常の削除
-twin remove agent-001
+twin remove feature-new
 
 # 強制削除（エラーを無視）
-twin remove agent-001 --force
+twin remove feature-new --force
 ```
 
 #### 設定管理
@@ -100,11 +100,12 @@ Twin は `twin.toml` という設定ファイルを使用します。プロジ�
 ```toml
 # twin.toml - Twin設定ファイルの例
 
-# ワークツリーのベースディレクトリ（デフォルト: "./worktrees"）
-worktree_base = "./worktrees"
+# ワークツリーのベースディレクトリ（デフォルト: "../"）
+# この設定を使用すると、作成されるディレクトリは "worktree_base/ブランチ名" になります
+worktree_base = "../workspaces"
 
-# ブランチ名のプレフィックス（デフォルト: "agent/"）
-branch_prefix = "agent/"
+# ブランチ名のプレフィックス（削除済み機能）
+# この設定は現在使用されていません
 
 # ファイルマッピング設定
 [[files]]
@@ -140,24 +141,24 @@ description = "Gitフック"
 [hooks]
 # 環境作成前に実行
 pre_create = [
-    { command = "echo 'Creating environment: {name}'", continue_on_error = false },
+    { command = "echo 'Creating branch: {branch}'", continue_on_error = false },
     { command = "npm install", continue_on_error = true, timeout = 300 }
 ]
 
 # 環境作成後に実行
 post_create = [
-    { command = "echo 'Environment {name} created successfully'", continue_on_error = false },
-    { command = "code ./worktrees/{name}", continue_on_error = true }
+    { command = "echo 'Branch {branch} created successfully'", continue_on_error = false },
+    { command = "code {worktree_path}", continue_on_error = true }
 ]
 
 # 環境削除前に実行
 pre_remove = [
-    { command = "echo 'Removing environment: {name}'", continue_on_error = false }
+    { command = "echo 'Removing branch: {branch}'", continue_on_error = false }
 ]
 
 # 環境削除後に実行
 post_remove = [
-    { command = "echo 'Environment {name} removed'", continue_on_error = false }
+    { command = "echo 'Branch {branch} removed'", continue_on_error = false }
 ]
 ```
 
@@ -177,7 +178,7 @@ post_remove = [
 
 | フィールド | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
-| `command` | string | ✓ | 実行するコマンド（`{name}`はエージェント名に置換） |
+| `command` | string | ✓ | 実行するコマンド（`{branch}`はブランチ名、`{worktree_path}`はパスに置換） |
 | `continue_on_error` | bool | - | エラー時も続行（デフォルト: false） |
 | `timeout` | u64 | - | タイムアウト秒数（デフォルト: 60） |
 

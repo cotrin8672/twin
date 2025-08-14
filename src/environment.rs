@@ -89,35 +89,32 @@ impl EnvironmentManager {
     /// 環境を作成（失敗時は自動ロールバック）
     pub fn create_environment(
         &mut self,
-        name: String,
-        branch: Option<String>,
+        branch_name: String,
+        worktree_path: PathBuf,
     ) -> TwinResult<AgentEnvironment> {
-        // 既存の環境名をチェック
-        if self.registry.get(&name).is_some() {
+        // 既存の環境をチェック（ブランチ名で管理）
+        if self.registry.get(&branch_name).is_some() {
             return Err(TwinError::AlreadyExists {
                 resource: "environment".to_string(),
-                name: name.clone(),
+                name: branch_name.clone(),
             });
         }
-
-        // ブランチ名を生成または使用
-        let branch_name = if let Some(b) = branch {
-            b
-        } else {
-            self.git.generate_agent_branch_name(&name, None)
-        };
 
         // ユニークなブランチ名を確保
         let unique_branch = self.git.generate_unique_branch_name(&branch_name, 10)?;
 
-        // Worktreeのパスを生成
-        let worktree_path = self.git.generate_worktree_path(&name);
+        // Worktreeのパスを絶対パスに変換
+        let worktree_path = if worktree_path.is_relative() {
+            std::env::current_dir()?.join(&worktree_path)
+        } else {
+            worktree_path
+        };
 
         // ロールバック用のクロージャ
         let rollback_path = worktree_path.clone();
-        let rollback_name = name.clone();
+        let rollback_branch = branch_name.clone();
         let rollback = || {
-            eprintln!("Rolling back environment creation for '{}'", rollback_name);
+            eprintln!("Rolling back environment creation for branch '{}'", rollback_branch);
             if rollback_path.exists() {
                 if let Err(e) = std::fs::remove_dir_all(&rollback_path) {
                     eprintln!("Failed to remove worktree directory during rollback: {}", e);
@@ -127,7 +124,7 @@ impl EnvironmentManager {
 
         // pre_createフックを実行
         for hook in &self.config.settings.hooks.pre_create {
-            if let Err(e) = self.execute_hook(hook, &name) {
+            if let Err(e) = self.execute_hook(hook, &branch_name) {
                 rollback();
                 return Err(e);
             }
@@ -188,7 +185,7 @@ impl EnvironmentManager {
 
         // 環境情報を作成
         let env = AgentEnvironment {
-            name: name.clone(),
+            name: branch_name.clone(),
             branch: unique_branch,
             worktree_path,
             symlinks,
@@ -200,11 +197,11 @@ impl EnvironmentManager {
 
         // レジストリに追加
         self.registry.add(env.clone());
-        self.registry.set_active(Some(name.clone()));
+        self.registry.set_active(Some(branch_name.clone()));
         if let Err(e) = self.save_registry() {
             // レジストリ保存に失敗したらロールバック
             rollback();
-            self.registry.remove(&name);
+            self.registry.remove(&branch_name);
             // 作成済みのシンボリックリンクを削除
             for created_link in &env.symlinks {
                 let _ = self.symlink.remove_symlink(&created_link.target);
@@ -214,10 +211,10 @@ impl EnvironmentManager {
 
         // post_createフックを実行
         for hook in &self.config.settings.hooks.post_create {
-            if let Err(e) = self.execute_hook(hook, &name) {
+            if let Err(e) = self.execute_hook(hook, &branch_name) {
                 // post_createフックが失敗した場合もロールバック
                 rollback();
-                self.registry.remove(&name);
+                self.registry.remove(&branch_name);
                 let _ = self.save_registry();
                 // 作成済みのシンボリックリンクを削除
                 for created_link in &env.symlinks {
@@ -231,20 +228,20 @@ impl EnvironmentManager {
     }
 
     /// 環境を削除
-    pub fn remove_environment(&mut self, name: &str, force: bool) -> TwinResult<()> {
+    pub fn remove_environment(&mut self, branch_name: &str, force: bool) -> TwinResult<()> {
         // 環境を取得
         let env = self
             .registry
-            .get(name)
+            .get(branch_name)
             .ok_or_else(|| TwinError::NotFound {
                 resource: "environment".to_string(),
-                name: name.to_string(),
+                name: branch_name.to_string(),
             })?
             .clone();
 
         // pre_removeフックを実行
         for hook in &self.config.settings.hooks.pre_remove {
-            self.execute_hook(hook, name)?;
+            self.execute_hook(hook, branch_name)?;
         }
 
         // シンボリックリンクを削除
@@ -272,12 +269,12 @@ impl EnvironmentManager {
         }
 
         // レジストリから削除
-        self.registry.remove(name);
+        self.registry.remove(branch_name);
         self.save_registry()?;
 
         // post_removeフックを実行
         for hook in &self.config.settings.hooks.post_remove {
-            self.execute_hook(hook, name)?;
+            self.execute_hook(hook, branch_name)?;
         }
 
         Ok(())
