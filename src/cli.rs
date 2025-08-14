@@ -50,10 +50,6 @@ pub struct CreateArgs {
     #[arg(short, long)]
     pub config: Option<PathBuf>,
 
-    /// 自動コミットの間隔（秒）
-    #[arg(long)]
-    pub auto_commit_interval: Option<u64>,
-
     /// 作成後にパスを表示
     #[arg(long)]
     pub print_path: bool,
