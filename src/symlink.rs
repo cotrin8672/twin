@@ -28,20 +28,24 @@ pub trait SymlinkManager {
     fn remove_symlink(&self, path: &Path) -> TwinResult<()>;
 
     /// シンボリックリンクを検証
+    #[allow(dead_code)]
     fn validate_symlink(&self, path: &Path) -> TwinResult<bool>;
 
     /// 最適なリンク戦略を選択
     fn select_strategy(&self, source: &Path, target: &Path) -> LinkStrategy;
 
     /// 手動作成方法の説明を取得
+    #[allow(dead_code)]
     fn get_manual_instructions(&self, source: &Path, target: &Path) -> String;
 }
 
 /// プラットフォーム別の実装を選択
 #[cfg(unix)]
+#[allow(dead_code)]
 pub type PlatformSymlinkManager = UnixSymlinkManager;
 
 #[cfg(windows)]
+#[allow(dead_code)]
 pub type PlatformSymlinkManager = WindowsSymlinkManager;
 
 /// Unix系OS用の実装
@@ -121,6 +125,7 @@ impl SymlinkManager for UnixSymlinkManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn validate_symlink(&self, path: &Path) -> TwinResult<bool> {
         if !path.exists() {
             return Ok(false);
@@ -143,6 +148,7 @@ impl SymlinkManager for UnixSymlinkManager {
         LinkStrategy::Symlink // Unixでは常にシンボリックリンク
     }
 
+    #[allow(dead_code)]
     fn get_manual_instructions(&self, source: &Path, target: &Path) -> String {
         format!(
             "To manually create the symlink, run:\n  ln -s \"{}\" \"{}\"",
@@ -328,6 +334,7 @@ impl SymlinkManager for WindowsSymlinkManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn validate_symlink(&self, path: &Path) -> TwinResult<bool> {
         if !path.exists() {
             return Ok(false);
@@ -364,6 +371,7 @@ impl SymlinkManager for WindowsSymlinkManager {
         }
     }
 
+    #[allow(dead_code)]
     fn get_manual_instructions(&self, source: &Path, target: &Path) -> String {
         if source.is_dir() {
             format!(
