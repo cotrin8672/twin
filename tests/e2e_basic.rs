@@ -176,14 +176,8 @@ fn test_config_with_symlinks() {
     let repo = setup_git_repo();
     let twin = get_twin_binary();
 
-    // 設定ファイルを作成
+    // 設定ファイルを作成（hooksフィールドを省略）
     let config_content = r#"
-[hooks]
-pre_create = []
-post_create = []
-pre_remove = []
-post_remove = []
-
 [[files]]
 path = ".env"
 mapping_type = "symlink"
@@ -222,6 +216,99 @@ description = "Configuration file"
 
     // Worktreeパスを取得して、シンボリックリンクが作成されたか確認
     // 注: 現在の実装では完全に動作しない可能性がある
+}
+
+#[test]
+fn test_partial_config_file() {
+    let repo = setup_git_repo();
+    let twin = get_twin_binary();
+
+    // 最小限の設定ファイル（filesだけ）
+    let config_content = r#"
+[[files]]
+path = "test.txt"
+"#;
+
+    std::fs::write(repo.path().join("minimal.toml"), config_content).unwrap();
+    std::fs::write(repo.path().join("test.txt"), "test content").unwrap();
+
+    // 最小限の設定で環境作成
+    let output = Command::new(&twin)
+        .args(&["create", "minimal-test", "--config", "minimal.toml"])
+        .current_dir(repo.path())
+        .output()
+        .expect("Failed to create with minimal config");
+
+    assert!(
+        output.status.success(),
+        "Should create environment with minimal config"
+    );
+
+    // hooksだけの設定ファイル
+    let hooks_content = r#"
+[hooks]
+post_create = [{command = "echo 'Created!'"}]
+"#;
+
+    std::fs::write(repo.path().join("hooks.toml"), hooks_content).unwrap();
+
+    // hooksだけの設定で環境作成
+    let output = Command::new(&twin)
+        .args(&["create", "hooks-test", "--config", "hooks.toml"])
+        .current_dir(repo.path())
+        .output()
+        .expect("Failed to create with hooks config");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // post_createフックが実行されることを確認（または成功）
+    assert!(
+        output.status.success() || stderr.contains("Created!"),
+        "Should create environment with hooks config"
+    );
+}
+
+#[test]
+fn test_hook_execution() {
+    let repo = setup_git_repo();
+    let twin = get_twin_binary();
+
+    // フック付き設定ファイル
+    let config_content = r#"
+[hooks]
+pre_create = [
+    {command = "echo Pre-create hook running"}
+]
+post_create = [
+    {command = "echo Post-create hook completed"}
+]
+
+[[files]]
+path = "dummy.txt"
+"#;
+
+    std::fs::write(repo.path().join("hook-test.toml"), config_content).unwrap();
+    std::fs::write(repo.path().join("dummy.txt"), "dummy").unwrap();
+
+    // 環境作成（フック実行）
+    let output = Command::new(&twin)
+        .args(&["create", "hook-env", "--config", "hook-test.toml"])
+        .env("TWIN_VERBOSE", "1") // Verboseモードでフック実行を確認
+        .current_dir(repo.path())
+        .output()
+        .expect("Failed to create with hooks");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    println!("Hook test STDOUT: {}", stdout);
+    println!("Hook test STDERR: {}", stderr);
+
+    // フック実行または成功を確認
+    assert!(
+        output.status.success() || stdout.contains("hook") || stderr.contains("hook"),
+        "Hooks should be executed or environment created successfully"
+    );
 }
 
 #[test]

@@ -181,16 +181,24 @@ impl Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigSettings {
     /// Git管理外ファイルの定義
+    #[serde(default)]
     pub files: Vec<FileMapping>,
 
     /// フック設定
+    #[serde(default)]
     pub hooks: HookConfig,
 
     /// Worktreeのベースディレクトリ
+    #[serde(default)]
     pub worktree_base: Option<PathBuf>,
 
     /// デフォルトのブランチプレフィックス
+    #[serde(default = "default_branch_prefix")]
     pub branch_prefix: Option<String>,
+}
+
+fn default_branch_prefix() -> Option<String> {
+    Some("agent".to_string())
 }
 
 impl Default for ConfigSettings {
