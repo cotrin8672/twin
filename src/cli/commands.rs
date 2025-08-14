@@ -130,6 +130,31 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
     // 設定ファイルのパスを決定
     let config_path = PathBuf::from(".twin.toml");
 
+    // サブコマンドの処理
+    if let Some(subcommand) = &args.subcommand {
+        match subcommand.as_str() {
+            "default" => {
+                // デフォルト設定をTOML形式で出力
+                let default_config = Config::default_example();
+                let toml_string = toml::to_string_pretty(&default_config.settings).map_err(|e| {
+                    crate::core::error::TwinError::Config {
+                        message: format!("デフォルト設定のシリアライズに失敗: {}", e),
+                        path: None,
+                        source: None,
+                    }
+                })?;
+                println!("# Twin設定ファイルのデフォルト例");
+                println!("# このファイルを .twin.toml として保存してください\n");
+                println!("{}", toml_string);
+                return Ok(());
+            }
+            _ => {
+                println!("不明なサブコマンド: {}", subcommand);
+                return Ok(());
+            }
+        }
+    }
+
     if args.show {
         // 現在の設定を表示
         if config_path.exists() {
@@ -162,6 +187,7 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
         }
     } else {
         println!("使用方法:");
+        println!("  twin config default         : デフォルト設定をTOML形式で出力");
         println!("  twin config --show          : 現在の設定を表示");
         println!("  twin config --set key=value : 設定値をセット");
         println!("  twin config --get key       : 設定値を取得");

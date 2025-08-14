@@ -80,6 +80,9 @@ pub struct RemoveArgs {
 /// configコマンドの引数
 #[derive(Parser)]
 pub struct ConfigArgs {
+    /// サブコマンド（default, show, etc）
+    pub subcommand: Option<String>,
+
     /// 現在の設定を表示
     #[arg(long)]
     pub show: bool,
