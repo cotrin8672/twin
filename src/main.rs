@@ -44,6 +44,9 @@ async fn main() -> Result<()> {
 
     // Handle commands
     match cli.command {
+        Commands::Add(args) => {
+            handle_add(args).await?;
+        }
         Commands::Create(args) => {
             handle_create(args).await?;
         }

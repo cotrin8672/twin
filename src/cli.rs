@@ -20,13 +20,18 @@ pub struct Cli {
 /// 利用可能なサブコマンドの定義
 #[derive(Subcommand)]
 pub enum Commands {
-    /// 新しいエージェント環境を作成
-    Create(CreateArgs),
+    /// ワークツリーを追加（git worktree add）
+    Add(AddArgs),
 
-    /// 全てのエージェント環境をリスト表示
+    /// ワークツリーを追加（addのエイリアス、後方互換性のため）
+    Create(AddArgs),
+
+    /// 全てのワークツリーをリスト表示
+    #[command(alias = "ls")]
     List(ListArgs),
 
-    /// エージェント環境を削除
+    /// ワークツリーを削除
+    #[command(alias = "delete")]
     Remove(RemoveArgs),
 
     /// 設定を管理
@@ -36,14 +41,14 @@ pub enum Commands {
     Tui,
 }
 
-/// createコマンドの引数
+/// addコマンドの引数（git worktree addと互換）
 #[derive(Parser)]
-pub struct CreateArgs {
-    /// ブランチ名（例: feature-x, bugfix-123）
-    pub branch_name: String,
+pub struct AddArgs {
+    /// ワークツリーのパス
+    pub path: PathBuf,
 
-    /// Worktreeのディレクトリパス（省略時は設定またはデフォルト）
-    pub directory: Option<PathBuf>,
+    /// ブランチ名（省略時はパスから推測）
+    pub branch: Option<String>,
 
     /// 設定ファイルのパス
     #[arg(short, long)]
@@ -66,11 +71,11 @@ pub struct ListArgs {
     pub format: String,
 }
 
-/// removeコマンドの引数
+/// removeコマンドの引数（git worktree removeと互換）
 #[derive(Parser)]
 pub struct RemoveArgs {
-    /// 削除するブランチ名
-    pub branch_name: String,
+    /// 削除するワークツリーのパスまたは名前
+    pub worktree: String,
 
     /// 確認なしで強制削除
     #[arg(short, long)]

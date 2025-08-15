@@ -2,7 +2,12 @@ use crate::cli::output::OutputFormatter;
 use crate::cli::*;
 use crate::core::{Config, TwinResult};
 
-pub async fn handle_create(args: CreateArgs) -> TwinResult<()> {
+// 後方互換性のためのcreateコマンドハンドラー
+pub async fn handle_create(args: AddArgs) -> TwinResult<()> {
+    handle_add(args).await
+}
+
+pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     use crate::git::GitManager;
     use crate::symlink::create_symlink_manager;
     
@@ -13,27 +18,25 @@ pub async fn handle_create(args: CreateArgs) -> TwinResult<()> {
         Config::new()
     };
 
-    // ディレクトリの決定
-    // 優先順位: 1. CLI引数 2. 設定ファイル 3. デフォルト(../branch_name)
-    let worktree_dir = if let Some(dir) = args.directory {
-        dir
-    } else if let Some(base) = &config.settings.worktree_base {
-        base.join(&args.branch_name)
+    // worktreeのパスを決定
+    let worktree_path = if args.path.is_relative() {
+        std::env::current_dir()?.join(&args.path)
     } else {
-        // デフォルト: 親ディレクトリにブランチ名のディレクトリを作成
-        std::path::PathBuf::from("..").join(&args.branch_name)
+        args.path.clone()
     };
 
-    // 絶対パスに変換
-    let worktree_path = if worktree_dir.is_relative() {
-        std::env::current_dir()?.join(&worktree_dir)
-    } else {
-        worktree_dir
-    };
+    // ブランチ名を決定（省略時はパスから推測）
+    let branch_name = args.branch.unwrap_or_else(|| {
+        args.path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("new-branch")
+            .to_string()
+    });
 
     // Git worktreeを作成
     let mut git = GitManager::new(std::path::Path::new("."))?;
-    let worktree_info = git.add_worktree(&worktree_path, Some(&args.branch_name), true)?;
+    let worktree_info = git.add_worktree(&worktree_path, Some(&branch_name), true)?;
     
     // シンボリックリンクを作成
     if !config.settings.files.is_empty() {
@@ -60,7 +63,7 @@ pub async fn handle_create(args: CreateArgs) -> TwinResult<()> {
     } else if args.cd_command {
         println!("cd \"{}\"", worktree_path.display());
     } else {
-        println!("✓ Worktree '{}' を作成しました", args.branch_name);
+        println!("✓ Worktree '{}' を作成しました", branch_name);
         println!("  Path: {}", worktree_path.display());
         println!("  Branch: {}", worktree_info.branch);
     }
@@ -91,15 +94,16 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
     // まずworktree一覧を取得して、対応するパスを探す
     let worktrees = git.list_worktrees()?;
     let worktree = worktrees.iter().find(|w| {
-        w.branch == args.branch_name || 
-        w.path.file_name().map(|n| n.to_string_lossy()) == Some(args.branch_name.clone().into())
+        w.branch == args.worktree || 
+        w.path.file_name().map(|n| n.to_string_lossy()) == Some(args.worktree.clone().into()) ||
+        w.path.to_string_lossy() == args.worktree
     });
     
     let path = if let Some(wt) = worktree {
         wt.path.clone()
     } else {
         // パスとして解釈してみる
-        PathBuf::from(&args.branch_name)
+        PathBuf::from(&args.worktree)
     };
 
     // 確認プロンプト
