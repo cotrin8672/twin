@@ -402,7 +402,6 @@ impl GitManager {
         Ok(branches)
     }
 
-
     /// ブランチが存在するか確認
     pub fn branch_exists(&mut self, branch_name: &str) -> TwinResult<bool> {
         let branches = self.list_branches(false)?;
@@ -463,7 +462,6 @@ impl GitManager {
         let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(branch)
     }
-
 
     /// cdコマンド文字列を生成
     pub fn generate_cd_command(&self, path: &Path) -> String {

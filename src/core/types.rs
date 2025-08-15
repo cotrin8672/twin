@@ -165,17 +165,17 @@ impl Config {
             global_path: None,
         }
     }
-    
+
     /// デフォルト設定（最小限）を作成
     pub fn default_example() -> Self {
         // 最小限のデフォルト設定
         let settings = ConfigSettings {
-            files: vec![],  // 空のファイルリスト
-            hooks: HookConfig::default(),  // すべて空のフック
-            worktree_base: None,  // デフォルト: ../ブランチ名
-            branch_prefix: None,  // 削除済み機能
+            files: vec![],                // 空のファイルリスト
+            hooks: HookConfig::default(), // すべて空のフック
+            worktree_base: None,          // デフォルト: ../ブランチ名
+            branch_prefix: None,          // 削除済み機能
         };
-        
+
         Self {
             settings,
             path: None,

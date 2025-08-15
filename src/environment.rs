@@ -114,7 +114,10 @@ impl EnvironmentManager {
         let rollback_path = worktree_path.clone();
         let rollback_branch = branch_name.clone();
         let rollback = || {
-            eprintln!("Rolling back environment creation for branch '{}'", rollback_branch);
+            eprintln!(
+                "Rolling back environment creation for branch '{}'",
+                rollback_branch
+            );
             if rollback_path.exists() {
                 if let Err(e) = std::fs::remove_dir_all(&rollback_path) {
                     eprintln!("Failed to remove worktree directory during rollback: {}", e);

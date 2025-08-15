@@ -194,7 +194,7 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
         } else {
             path
         };
-        
+
         println!(
             "{:<30} {:<30} {:<12}",
             path_short,
@@ -216,7 +216,12 @@ fn format_worktrees_json(worktrees: &[WorktreeInfo]) -> Result<()> {
 /// Worktree一覧をシンプル形式で出力
 fn format_worktrees_simple(worktrees: &[WorktreeInfo]) -> Result<()> {
     for worktree in worktrees {
-        println!("{} {} {}", worktree.path.display(), worktree.branch, worktree.commit);
+        println!(
+            "{} {} {}",
+            worktree.path.display(),
+            worktree.branch,
+            worktree.commit
+        );
     }
     Ok(())
 }

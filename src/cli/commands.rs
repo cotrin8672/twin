@@ -10,7 +10,7 @@ pub async fn handle_create(args: AddArgs) -> TwinResult<()> {
 pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     use crate::git::GitManager;
     use crate::symlink::create_symlink_manager;
-    
+
     // 設定を読み込む
     let config = if let Some(config_path) = &args.config {
         Config::from_path(config_path)?
@@ -37,21 +37,21 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     // Git worktreeを作成
     let mut git = GitManager::new(std::path::Path::new("."))?;
     let worktree_info = git.add_worktree(&worktree_path, Some(&branch_name), true)?;
-    
+
     // シンボリックリンクを作成
     if !config.settings.files.is_empty() {
         let symlink_manager = create_symlink_manager();
         let repo_root = git.get_repo_path();
-        
+
         for mapping in &config.settings.files {
             let source = repo_root.join(&mapping.path);
             let target = worktree_path.join(&mapping.path);
-            
+
             // ターゲットディレクトリを作成
             if let Some(parent) = target.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            
+
             // シンボリックリンクを作成
             symlink_manager.create_symlink(&source, &target)?;
         }
@@ -73,7 +73,7 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
 
 pub async fn handle_list(args: ListArgs) -> TwinResult<()> {
     use crate::git::GitManager;
-    
+
     // git worktree list を使用
     let mut git = GitManager::new(std::path::Path::new("."))?;
     let worktrees = git.list_worktrees()?;
@@ -87,18 +87,18 @@ pub async fn handle_list(args: ListArgs) -> TwinResult<()> {
 pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
     use crate::git::GitManager;
     use std::path::PathBuf;
-    
+
     // Worktreeのパスかブランチ名で削除
     let mut git = GitManager::new(std::path::Path::new("."))?;
-    
+
     // まずworktree一覧を取得して、対応するパスを探す
     let worktrees = git.list_worktrees()?;
     let worktree = worktrees.iter().find(|w| {
-        w.branch == args.worktree || 
-        w.path.file_name().map(|n| n.to_string_lossy()) == Some(args.worktree.clone().into()) ||
-        w.path.to_string_lossy() == args.worktree
+        w.branch == args.worktree
+            || w.path.file_name().map(|n| n.to_string_lossy()) == Some(args.worktree.clone().into())
+            || w.path.to_string_lossy() == args.worktree
     });
-    
+
     let path = if let Some(wt) = worktree {
         wt.path.clone()
     } else {
@@ -163,11 +163,13 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
                 println!("#   {{ command = \"echo\", args = [\"Creating: {{branch}}\"] }}");
                 println!("# ]");
                 println!("# post_create = [");
-                println!("#   {{ command = \"npm\", args = [\"install\"], continue_on_error = true }}");
+                println!(
+                    "#   {{ command = \"npm\", args = [\"install\"], continue_on_error = true }}"
+                );
                 println!("# ]");
                 println!("# pre_remove = []");
                 println!("# post_remove = []");
-                
+
                 return Ok(());
             }
             _ => {
