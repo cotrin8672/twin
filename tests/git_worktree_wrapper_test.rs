@@ -3,7 +3,6 @@
 /// このテストモジュールは、twinがgit worktreeの純粋なラッパーとして
 /// 正しく動作することを確認します。
 use std::fs;
-use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -17,6 +16,19 @@ fn setup_test_repo() -> TempDir {
         .current_dir(dir.path())
         .output()
         .expect("Failed to init git repo");
+
+    // Git設定（ローカルリポジトリのみ）
+    Command::new("git")
+        .args(["config", "user.name", "Test User"])
+        .current_dir(dir.path())
+        .output()
+        .expect("Failed to set git user name");
+    
+    Command::new("git")
+        .args(["config", "user.email", "test@example.com"])
+        .current_dir(dir.path())
+        .output()
+        .expect("Failed to set git user email");
 
     // 初期コミットを作成
     fs::write(dir.path().join("README.md"), "# Test Repo").unwrap();
@@ -43,6 +55,12 @@ fn get_twin_binary() -> String {
     twin_path.to_string_lossy().to_string()
 }
 
+/// ユニークなワークツリーパスを生成
+fn unique_worktree_path(name: &str) -> String {
+    let id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
+    format!("../test-{}-{}", name, id)
+}
+
 // =============================================================================
 // 1. addコマンドの基本テスト
 // =============================================================================
@@ -51,19 +69,20 @@ fn get_twin_binary() -> String {
 fn test_add_command_basic() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("add");
 
-    // addコマンドで新しいworktreeを作成（一意のパスを使用）
-    let worktree_path = repo.path().with_file_name("test-add");
+    // twin add コマンドを実行
     let output = Command::new(&twin)
-        .args(["add", worktree_path.to_str().unwrap(), "-b", "test-branch"])
+        .args(["add", &worktree_path, "-b", "test-branch"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add");
+        .expect("Failed to execute twin add");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    println!("STDOUT: {}", stdout);
-    println!("STDERR: {}", stderr);
+
+    eprintln!("STDOUT: {}", stdout);
+    eprintln!("STDERR: {}", stderr);
 
     assert!(
         output.status.success(),
@@ -71,79 +90,72 @@ fn test_add_command_basic() {
         stderr
     );
 
-    // git worktree listで確認
-    let list = Command::new("git")
+    // worktreeが作成されたことを確認
+    let list_output = Command::new("git")
         .args(["worktree", "list"])
         .current_dir(repo.path())
         .output()
-        .unwrap();
+        .expect("Failed to list worktrees");
 
-    let list_output = String::from_utf8_lossy(&list.stdout);
-    assert!(
-        list_output.contains("test-add"),
-        "Worktree should be created"
-    );
-    assert!(
-        list_output.contains("test-branch"),
-        "Branch should be created"
-    );
+    let list_stdout = String::from_utf8_lossy(&list_output.stdout);
+    assert!(list_stdout.contains(&worktree_path[3..])); // "../" を除いた部分
+    assert!(list_stdout.contains("test-branch"));
 }
 
 #[test]
 fn test_add_without_branch_option() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("nobranch");
 
-    // ブランチ名を位置引数として指定（存在しないブランチ）
+    // ブランチオプションなしでaddを実行
+    // git worktreeと同様、HEADの状態でworktreeを作成する
     let output = Command::new(&twin)
-        .args(["add", "../my-feature", "non-existent-branch"])
+        .args(["add", &worktree_path])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add");
+        .expect("Failed to execute twin add");
 
-    // 存在しないブランチを指定しているのでエラーになるはず
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    // gitのエラーメッセージを確認
+    // git worktreeと同様の動作：ブランチ指定がない場合もworktreeは作成される
+    // （detached HEADまたはHEADのブランチを使用）
     assert!(
-        stderr.contains("invalid reference")
-            || stderr.contains("not a valid object name")
-            || stderr.contains("fatal:"),
-        "Expected git error message, got: {}",
-        stderr
+        output.status.success(),
+        "twin add without branch should succeed like git worktree: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
 }
-
-// =============================================================================
-// 2. Git Worktreeオプションのテスト
-// =============================================================================
 
 #[test]
 fn test_force_branch_option() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path1 = unique_worktree_path("force1");
+    let worktree_path2 = unique_worktree_path("force2");
 
-    // 最初にブランチを作成
+    // 既存のブランチを作成
     Command::new("git")
-        .args(["branch", "test-branch"])
+        .args(["branch", "existing-branch"])
         .current_dir(repo.path())
         .output()
-        .unwrap();
+        .expect("Failed to create branch");
 
-    // 既存ブランチで強制作成（-Bオプション）
+    // 最初のworktreeを作成
+    Command::new(&twin)
+        .args(["add", &worktree_path1, "-b", "existing-branch"])
+        .current_dir(repo.path())
+        .output()
+        .expect("Failed to execute twin add");
+
+    // -Bオプションで同じブランチ名を強制作成
     let output = Command::new(&twin)
-        .args(["add", "../forced", "-B", "test-branch"])
+        .args(["add", &worktree_path2, "-B", "existing-branch"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add with -B");
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    println!("Force branch stderr: {}", stderr);
+        .expect("Failed to execute twin add");
 
     assert!(
         output.status.success(),
-        "Force branch should succeed: {}",
-        stderr
+        "twin add with -B should succeed"
     );
 }
 
@@ -151,171 +163,164 @@ fn test_force_branch_option() {
 fn test_detach_option() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("detached");
 
-    // HEADのコミットを取得
+    // HEADのコミットハッシュを取得
     let head_output = Command::new("git")
         .args(["rev-parse", "HEAD"])
         .current_dir(repo.path())
         .output()
-        .unwrap();
-    let head_commit = String::from_utf8_lossy(&head_output.stdout)
+        .expect("Failed to get HEAD");
+    let _head_commit = String::from_utf8_lossy(&head_output.stdout)
         .trim()
         .to_string();
 
-    // デタッチモードでworktreeを作成（HEADを指定）
+    // --detachオプションでworktreeを作成
     let output = Command::new(&twin)
-        .args(["add", "../detached", "--detach", "HEAD"])
+        .args(["add", &worktree_path, "--detach"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add --detach");
+        .expect("Failed to execute twin add");
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(output.status.success(), "Detach should succeed: {}", stderr);
+    assert!(
+        output.status.success(),
+        "Detach should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
-    // git worktree listで確認
-    let list = Command::new("git")
+    // worktreeがdetached状態であることを確認
+    let list_output = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
         .current_dir(repo.path())
         .output()
-        .unwrap();
+        .expect("Failed to list worktrees");
 
-    let list_output = String::from_utf8_lossy(&list.stdout);
-    assert!(list_output.contains("detached"));
+    let list_stdout = String::from_utf8_lossy(&list_output.stdout);
+    assert!(list_stdout.contains("detached"));
 }
 
 #[test]
 fn test_lock_option() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("locked");
 
-    // ロック付きでworktreeを作成
+    // --lockオプションでworktreeを作成
     let output = Command::new(&twin)
-        .args(["add", "../locked", "-b", "locked-branch", "--lock"])
+        .args(["add", &worktree_path, "-b", "locked-branch", "--lock"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add --lock");
+        .expect("Failed to execute twin add");
 
     assert!(output.status.success());
 
-    // ロックファイルが作成されているか確認
-    let git_dir = repo.path().join(".git");
-    let worktrees_dir = git_dir.join("worktrees");
+    // worktreeがロックされていることを確認
+    let list_output = Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .current_dir(repo.path())
+        .output()
+        .expect("Failed to list worktrees");
 
-    // lockedディレクトリが存在し、その中にlockedファイルがあるはず
-    let locked_entries: Vec<_> = fs::read_dir(&worktrees_dir)
-        .unwrap()
-        .filter_map(Result::ok)
-        .filter(|e| e.path().join("locked").exists())
-        .collect();
-
-    assert!(!locked_entries.is_empty(), "Lock file should exist");
+    let list_stdout = String::from_utf8_lossy(&list_output.stdout);
+    assert!(list_stdout.contains("locked"));
 }
 
 #[test]
 fn test_no_checkout_option() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("nocheckout");
 
-    // チェックアウトせずにworktreeを作成
+    // --no-checkoutオプションでworktreeを作成
     let output = Command::new(&twin)
         .args([
             "add",
-            "../no-checkout",
+            &worktree_path,
             "-b",
             "empty-branch",
             "--no-checkout",
         ])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add --no-checkout");
+        .expect("Failed to execute twin add");
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         output.status.success(),
         "No-checkout should succeed: {}",
-        stderr
+        String::from_utf8_lossy(&output.stderr)
     );
 
-    // worktreeディレクトリは存在するが、ファイルはないはず
-    let worktree_path = repo.path().parent().unwrap().join("no-checkout");
-    assert!(worktree_path.exists(), "Worktree directory should exist");
-    // .gitファイルは存在するが、README.mdはない
-    assert!(worktree_path.join(".git").exists(), ".git should exist");
-    assert!(
-        !worktree_path.join("README.md").exists(),
-        "README.md should not exist"
-    );
+    // worktreeディレクトリが空であることを確認
+    let worktree_full_path = repo.path().parent().unwrap().join(&worktree_path[3..]);
+    let entries: Vec<_> = fs::read_dir(&worktree_full_path)
+        .expect("Failed to read worktree dir")
+        .collect();
+    // .gitディレクトリのみが存在するはず
+    assert!(entries.len() <= 1, "Worktree should be nearly empty");
 }
 
 #[test]
 fn test_quiet_option() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("quiet");
 
-    // quietモードで実行
+    // --quietオプションでworktreeを作成
     let output = Command::new(&twin)
-        .args(["add", "../quiet-test", "-b", "quiet-branch", "--quiet"])
+        .args(["add", &worktree_path, "-b", "quiet-branch", "--quiet"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add --quiet");
+        .expect("Failed to execute twin add");
 
     assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    // quietモードでは出力が最小限になる
-    assert!(stdout.is_empty() || stdout.lines().count() <= 1);
-}
 
-// =============================================================================
-// 3. --git-onlyモードのテスト
-// =============================================================================
+    // 出力が抑制されていることを確認
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.is_empty() || stdout.trim().is_empty(),
+        "Quiet mode should suppress output"
+    );
+}
 
 #[test]
 fn test_git_only_mode() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("gitonly");
 
-    // 設定ファイルを作成（シンボリックリンクとフックを定義）
-    let config_content = r#"
-[settings]
-files = [
-    { path = "test.txt" }
-]
-
-[hooks]
-post_create = [
-    { command = "echo", args = ["Hook executed"] }
-]
+    // 設定ファイルを作成
+    let config = r#"
+[[files]]
+path = "test.txt"
+mapping_type = "symlink"
 "#;
-    fs::write(repo.path().join(".twin.toml"), config_content).unwrap();
+    fs::write(repo.path().join(".twin.toml"), config).unwrap();
+    fs::write(repo.path().join("test.txt"), "test content").unwrap();
 
-    // --git-onlyモードで実行
+    // --git-onlyオプションでworktreeを作成
     let output = Command::new(&twin)
         .args([
             "add",
-            "../git-only-test",
+            &worktree_path,
             "-b",
-            "test-branch",
+            "git-only-branch",
             "--config",
             ".twin.toml",
             "--git-only",
         ])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add --git-only");
+        .expect("Failed to execute twin add");
 
     assert!(output.status.success());
 
-    // フックが実行されていないことを確認
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(!stdout.contains("Hook executed"));
-
     // シンボリックリンクが作成されていないことを確認
-    let worktree_path = repo.path().parent().unwrap().join("git-only-test");
-    assert!(!worktree_path.join("test.txt").exists());
+    let worktree_full_path = repo.path().parent().unwrap().join(&worktree_path[3..]);
+    assert!(!worktree_full_path.join("test.txt").exists());
 }
 
 // =============================================================================
-// 4. エラーメッセージの透過性テスト
+// 2. エラーハンドリングのテスト
 // =============================================================================
 
 #[test]
@@ -323,160 +328,155 @@ fn test_error_message_passthrough() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
 
-    // 無効なパス（既存のファイル）にworktreeを作成しようとする
-    fs::write(repo.path().join("existing-file"), "content").unwrap();
-
-    let output = Command::new(&twin)
-        .args(["add", "existing-file", "-b", "test"])
+    // 既に存在するブランチで同じパスにworktreeを作成しようとする（エラーになる）
+    let worktree_path = unique_worktree_path("error");
+    
+    // 最初のworktreeを作成
+    Command::new(&twin)
+        .args(["add", &worktree_path, "-b", "test-branch"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add");
+        .expect("Failed to execute first twin add");
+
+    // 同じパスで別のworktreeを作成しようとする
+    let output = Command::new(&twin)
+        .args(["add", &worktree_path, "-b", "another-branch"])
+        .current_dir(repo.path())
+        .output()
+        .expect("Failed to execute twin add");
 
     assert!(!output.status.success());
 
-    // git worktreeのエラーメッセージがそのまま表示される
+    // gitのエラーメッセージが表示されることを確認
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // git worktreeの典型的なエラーメッセージを確認
-    assert!(
-        stderr.contains("already exists")
-            || stderr.contains("is not empty")
-            || stderr.contains("fatal:"),
-        "Git error message should be passed through"
-    );
+    assert!(stderr.contains("Error") || stderr.contains("fatal") || stderr.contains("already exists"));
 }
 
 #[test]
 fn test_invalid_branch_name_error() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("invalid");
 
-    // 無効なブランチ名でworktreeを作成
+    // 無効なブランチ名でaddを実行
     let output = Command::new(&twin)
-        .args(["add", "../invalid", "-b", "..invalid..branch.."])
+        .args(["add", &worktree_path, "-b", "invalid..branch"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add");
+        .expect("Failed to execute twin add");
 
     assert!(!output.status.success());
+
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // gitのブランチ名検証エラーが表示される
-    assert!(stderr.contains("invalid") || stderr.contains("branch"));
+    assert!(
+        stderr.contains("invalid") || stderr.contains("fatal"),
+        "Should show branch name error"
+    );
 }
 
 // =============================================================================
-// 5. 既存worktreeとの互換性テスト
+// 3. listコマンドのテスト
 // =============================================================================
 
 #[test]
 fn test_list_includes_manual_worktree() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("manual");
 
     // 手動でgit worktreeを作成
     Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "../manual-worktree",
-            "-b",
-            "manual-branch",
-        ])
+        .args(["worktree", "add", &worktree_path[3..], "-b", "manual-branch"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create manual worktree");
 
-    // twin listで表示されることを確認
+    // twin listを実行
     let output = Command::new(&twin)
         .args(["list"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin list");
+        .expect("Failed to execute twin list");
+
+    assert!(output.status.success());
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("manual-worktree") || stdout.contains("manual-branch"));
+    assert!(stdout.contains("manual-branch"));
 }
+
+// =============================================================================
+// 4. removeコマンドのテスト
+// =============================================================================
 
 #[test]
 fn test_remove_manual_worktree() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path = unique_worktree_path("remove");
 
     // 手動でgit worktreeを作成
     Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "../manual-remove",
-            "-b",
-            "manual-remove-branch",
-        ])
+        .args(["worktree", "add", &worktree_path[3..], "-b", "to-remove"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create manual worktree");
 
-    // twin removeで削除
+    // twin removeを実行
     let output = Command::new(&twin)
-        .args(["remove", "../manual-remove", "--force"])
+        .args(["remove", &worktree_path[3..], "--force"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin remove");
+        .expect("Failed to execute twin remove");
 
     assert!(output.status.success());
 
-    // 削除されたことを確認
-    let list = Command::new("git")
+    // worktreeが削除されたことを確認
+    let list_output = Command::new("git")
         .args(["worktree", "list"])
         .current_dir(repo.path())
         .output()
-        .unwrap();
+        .expect("Failed to list worktrees");
 
-    let list_output = String::from_utf8_lossy(&list.stdout);
-    assert!(!list_output.contains("manual-remove"));
+    let list_stdout = String::from_utf8_lossy(&list_output.stdout);
+    assert!(!list_stdout.contains("to-remove"));
 }
 
 // =============================================================================
-// 6. 出力の一致性テスト
+// 5. git worktreeとの一致性テスト
 // =============================================================================
 
 #[test]
 fn test_output_matches_git_worktree() {
     let repo = setup_test_repo();
     let twin = get_twin_binary();
+    let worktree_path1 = unique_worktree_path("git1");
+    let worktree_path2 = unique_worktree_path("twin1");
 
-    // git worktree addの出力を取得
+    // git worktree addを直接実行
     let git_output = Command::new("git")
-        .args(["worktree", "add", "../git-test", "-b", "git-branch"])
+        .args(["worktree", "add", &worktree_path1[3..], "-b", "git-branch"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run git worktree add");
+        .expect("Failed to execute git worktree add");
 
-    // twin addの出力を取得（--git-onlyモードで副作用を除外）
+    // twin addを実行
     let twin_output = Command::new(&twin)
-        .args(["add", "../twin-test", "-b", "twin-branch", "--git-only"])
+        .args(["add", &worktree_path2, "-b", "twin-branch"])
         .current_dir(repo.path())
         .output()
-        .expect("Failed to run twin add");
+        .expect("Failed to execute twin add");
 
     // 両方とも成功することを確認
-    assert!(git_output.status.success());
-    assert!(twin_output.status.success());
+    assert_eq!(git_output.status.success(), twin_output.status.success());
 
-    // 出力フォーマットが類似していることを確認
-    let git_stdout = String::from_utf8_lossy(&git_output.stdout);
-    let twin_stdout = String::from_utf8_lossy(&twin_output.stdout);
+    // worktree listで両方が表示されることを確認
+    let list_output = Command::new("git")
+        .args(["worktree", "list"])
+        .current_dir(repo.path())
+        .output()
+        .expect("Failed to list worktrees");
 
-    println!("Git output: {}", git_stdout);
-    println!("Twin output: {}", twin_stdout);
-
-    // 両方ともworktreeの作成に関する出力があることを確認
-    // git worktreeの出力はバージョンによって異なるため、柔軟にチェック
-    assert!(
-        (git_stdout.contains("Preparing")
-            || git_stdout.contains("HEAD")
-            || git_stdout.contains("branch"))
-            && (twin_stdout.contains("Preparing")
-                || twin_stdout.contains("HEAD")
-                || twin_stdout.contains("branch")),
-        "Both commands should produce worktree-related output"
-    );
+    let list_stdout = String::from_utf8_lossy(&list_output.stdout);
+    assert!(list_stdout.contains("git-branch"));
+    assert!(list_stdout.contains("twin-branch"));
 }

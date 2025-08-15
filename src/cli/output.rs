@@ -77,26 +77,99 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
         return Ok(());
     }
 
-    // ヘッダー
-    println!("{:<20} {:<15} {:<50}", "Branch", "Status", "Path");
-    println!("{}", "-".repeat(85));
-
-    // Worktree一覧
-    for wt in worktrees {
-        let status = if wt.locked {
-            "locked"
-        } else if wt.prunable {
-            "prunable"
-        } else {
-            "normal"
+    // メインリポジトリと作業ツリーを分けて表示
+    // 通常、最初のエントリーがメインリポジトリ（bare でない限り）
+    let (main_repo, work_trees) = if !worktrees.is_empty() {
+        // 最初のエントリーか、現在のディレクトリと同じパスのものをメインリポジトリとする
+        let current_dir = std::env::current_dir().ok();
+        let is_main = |w: &WorktreeInfo| -> bool {
+            if let Some(ref cwd) = current_dir {
+                // 現在のディレクトリと一致するか確認
+                w.path.canonicalize().ok() == cwd.canonicalize().ok()
+            } else {
+                false
+            }
         };
+        
+        if let Some(main_idx) = worktrees.iter().position(is_main) {
+            let mut all: Vec<WorktreeInfo> = worktrees.to_vec();
+            let main = all.remove(main_idx);
+            (Some(main), all)
+        } else {
+            // 現在のディレクトリと一致するものがない場合、最初のエントリーをメインとする
+            let mut all: Vec<WorktreeInfo> = worktrees.to_vec();
+            if !all.is_empty() {
+                let main = all.remove(0);
+                (Some(main), all)
+            } else {
+                (None, vec![])
+            }
+        }
+    } else {
+        (None, vec![])
+    };
 
-        println!(
-            "{:<20} {:<15} {:<50}",
-            if wt.branch.is_empty() { "(no branch)" } else { &wt.branch },
-            status,
-            wt.path.to_string_lossy()
-        );
+    // メインリポジトリの表示
+    if let Some(main) = main_repo {
+        println!("📁 Main Repository");
+        println!("  Branch: {}", if main.branch.is_empty() { "(no branch)" } else { &main.branch });
+        println!("  Path:   {}", main.path.to_string_lossy());
+        println!("  Commit: {}", &main.commit[..8.min(main.commit.len())]);
+        println!();
+    }
+
+    // ワークツリーの表示
+    if !work_trees.is_empty() {
+        println!("🌲 Work Trees");
+        println!("{}", "-".repeat(80));
+        
+        // ヘッダー
+        println!("{:<30} {:<10} {:<12} {:<30}", "Branch", "Status", "Commit", "Path");
+        println!("{}", "-".repeat(80));
+
+        // Worktree一覧
+        for wt in work_trees.iter() {
+            let status = if wt.locked {
+                "🔒 locked"
+            } else if wt.prunable {
+                "⚠️  prunable"
+            } else {
+                "✓ active"
+            };
+
+            let branch_display = if wt.branch.is_empty() { 
+                "(no branch)".to_string()
+            } else if wt.branch.len() > 28 {
+                format!("{}...", &wt.branch[..25])
+            } else {
+                wt.branch.clone()
+            };
+
+            let path_display = {
+                let path_str = wt.path.to_string_lossy();
+                if path_str.len() > 28 {
+                    // パスが長い場合は最後の部分を表示
+                    if let Some(file_name) = wt.path.file_name() {
+                        format!(".../{}", file_name.to_string_lossy())
+                    } else {
+                        format!("...{}", &path_str[path_str.len()-25..])
+                    }
+                } else {
+                    path_str.to_string()
+                }
+            };
+
+            println!(
+                "{:<30} {:<10} {:<12} {:<30}",
+                branch_display,
+                status,
+                &wt.commit[..8.min(wt.commit.len())],
+                path_display
+            );
+        }
+        
+        println!("{}", "-".repeat(80));
+        println!("Total: {} worktree(s)", work_trees.len());
     }
 
     Ok(())

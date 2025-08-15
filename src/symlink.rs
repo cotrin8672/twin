@@ -72,6 +72,14 @@ impl SymlinkManager for UnixSymlinkManager {
             );
         }
 
+        // ソースファイルの存在チェック
+        if !source.exists() {
+            return Err(TwinError::symlink(
+                format!("Source path does not exist: {}", source.display()),
+                Some(source.to_path_buf()),
+            ));
+        }
+
         // 既存のリンクやファイルがある場合は削除
         if target.exists() || target.is_symlink() {
             fs::remove_file(target).ok();
@@ -235,6 +243,14 @@ impl SymlinkManager for WindowsSymlinkManager {
                 target.display(),
                 source.display()
             );
+        }
+
+        // ソースファイルの存在チェック
+        if !source.exists() {
+            return Err(TwinError::symlink(
+                format!("Source path does not exist: {}", source.display()),
+                Some(source.to_path_buf()),
+            ));
         }
 
         // 既存のファイルを削除
