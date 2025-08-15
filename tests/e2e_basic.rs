@@ -393,9 +393,9 @@ fn test_custom_branch_name() {
     let repo = setup_git_repo();
     let twin = get_twin_binary();
 
-    // カスタムブランチ名で作成（新しい引数形式: path branch）
+    // カスタムブランチ名で作成（-bオプションを使用）
     let output = Command::new(&twin)
-        .args(["create", "../custom", "feature/my-branch"])
+        .args(["create", "-b", "feature/my-branch", "../custom"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create with custom branch");

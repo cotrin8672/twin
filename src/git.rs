@@ -184,6 +184,51 @@ impl GitManager {
         self.get_worktree_info(path)
     }
 
+    /// Worktreeを追加（オプションを直接渡す）
+    pub fn add_worktree_with_options(
+        &mut self,
+        args: &[&str],
+    ) -> TwinResult<Output> {
+        let mut full_args = vec!["worktree", "add"];
+        full_args.extend_from_slice(args);
+        
+        self.execute_git_command_raw(&full_args)
+    }
+
+    /// Gitコマンドを実行し、エラーメッセージをそのまま表示
+    pub fn execute_git_command_raw(&mut self, args: &[&str]) -> TwinResult<Output> {
+        let command_str = format!("git {}", args.join(" "));
+        info!("Executing: {}", command_str);
+        
+        if self.dry_run {
+            info!("[DRY RUN] Would execute: {}", command_str);
+            return Ok(Output {
+                #[cfg(unix)]
+                status: std::os::unix::process::ExitStatusExt::from_raw(0),
+                #[cfg(windows)]
+                status: std::os::windows::process::ExitStatusExt::from_raw(0),
+                stdout: b"[DRY RUN]".to_vec(),
+                stderr: Vec::new(),
+            });
+        }
+
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(&self.repo_path)
+            .output()
+            .map_err(|e| {
+                TwinError::git(format!("{}", e))
+            })?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // git worktreeのエラーメッセージをそのまま返す
+            return Err(TwinError::git(stderr.trim().to_string()));
+        }
+
+        Ok(output)
+    }
+
     /// Worktreeを削除
     pub fn remove_worktree(&mut self, path: &Path, force: bool) -> TwinResult<()> {
         let mut args = vec!["worktree", "remove"];

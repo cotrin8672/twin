@@ -12,7 +12,7 @@
     - `twin remove <worktree>`でgit worktree removeと同じ動作
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-  - [ ] 1.2 git worktreeコマンドの直接実行
+  - [x] 1.2 git worktreeコマンドの直接実行
     - `src/git.rs`のGitManagerで実際のgit worktreeコマンドを実行
     - 引数やオプションをそのままgit worktreeに渡す
     - エラーメッセージもgit worktreeのものをそのまま表示

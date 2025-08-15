@@ -47,20 +47,64 @@ pub struct AddArgs {
     /// ワークツリーのパス
     pub path: PathBuf,
 
-    /// ブランチ名（省略時はパスから推測）
+    /// ブランチ名またはコミット（省略時はパスから推測）
     pub branch: Option<String>,
 
-    /// 設定ファイルのパス
-    #[arg(short, long)]
+    /// 新しいブランチを作成
+    #[arg(short = 'b', long)]
+    pub new_branch: Option<String>,
+
+    /// 新しいブランチを強制的に作成
+    #[arg(short = 'B', long)]
+    pub force_branch: Option<String>,
+
+    /// デタッチモード
+    #[arg(short = 'd', long)]
+    pub detach: bool,
+
+    /// ロックする
+    #[arg(long)]
+    pub lock: bool,
+
+    /// 追跡モードを設定
+    #[arg(long)]
+    pub track: bool,
+
+    /// 追跡モードを無効
+    #[arg(long)]
+    pub no_track: bool,
+
+    /// リモートブランチを推測
+    #[arg(long)]
+    pub guess_remote: bool,
+
+    /// リモートブランチを推測しない
+    #[arg(long)]
+    pub no_guess_remote: bool,
+
+    /// チェックアウトしない
+    #[arg(long)]
+    pub no_checkout: bool,
+
+    /// quietモード
+    #[arg(short = 'q', long)]
+    pub quiet: bool,
+
+    /// twin固有: 設定ファイルのパス
+    #[arg(short = 'c', long)]
     pub config: Option<PathBuf>,
 
-    /// 作成後にパスを表示
+    /// twin固有: 作成後にパスを表示
     #[arg(long)]
     pub print_path: bool,
 
-    /// 作成後にcdコマンドを表示
+    /// twin固有: 作成後にcdコマンドを表示
     #[arg(long)]
     pub cd_command: bool,
+
+    /// twin固有: 副作用をスキップしてgit worktreeのみ実行
+    #[arg(long)]
+    pub git_only: bool,
 }
 
 /// listコマンドの引数

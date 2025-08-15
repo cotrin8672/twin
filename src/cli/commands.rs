@@ -18,6 +18,54 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         Config::new()
     };
 
+    // git worktree addの引数を構築
+    let mut worktree_args = Vec::new();
+    
+    // オプションを追加
+    if let Some(branch) = &args.new_branch {
+        worktree_args.push("-b");
+        worktree_args.push(branch.as_str());
+    }
+    if let Some(branch) = &args.force_branch {
+        worktree_args.push("-B");
+        worktree_args.push(branch.as_str());
+    }
+    if args.detach {
+        worktree_args.push("--detach");
+    }
+    if args.lock {
+        worktree_args.push("--lock");
+    }
+    if args.track {
+        worktree_args.push("--track");
+    }
+    if args.no_track {
+        worktree_args.push("--no-track");
+    }
+    if args.guess_remote {
+        worktree_args.push("--guess-remote");
+    }
+    if args.no_guess_remote {
+        worktree_args.push("--no-guess-remote");
+    }
+    if args.no_checkout {
+        worktree_args.push("--no-checkout");
+    }
+    if args.quiet {
+        worktree_args.push("--quiet");
+    }
+    
+    // パスを追加
+    let path_str = args.path.to_string_lossy();
+    worktree_args.push(&path_str);
+    
+    // ブランチ/コミットを追加
+    let branch_str;
+    if let Some(branch) = &args.branch {
+        branch_str = branch.clone();
+        worktree_args.push(&branch_str);
+    }
+
     // worktreeのパスを決定
     let worktree_path = if args.path.is_relative() {
         std::env::current_dir()?.join(&args.path)
@@ -25,18 +73,21 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         args.path.clone()
     };
 
-    // ブランチ名を決定（省略時はパスから推測）
-    let branch_name = args.branch.unwrap_or_else(|| {
-        args.path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("new-branch")
-            .to_string()
-    });
-
     // Git worktreeを作成
     let mut git = GitManager::new(std::path::Path::new("."))?;
-    let worktree_info = git.add_worktree(&worktree_path, Some(&branch_name), true)?;
+    
+    // git_onlyモードの場合は副作用をスキップ
+    if args.git_only {
+        let output = git.add_worktree_with_options(&worktree_args)?;
+        if !args.quiet {
+            print!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+        return Ok(());
+    }
+    
+    // 通常モード: git worktreeを実行して副作用を適用
+    let output = git.add_worktree_with_options(&worktree_args)?;
+    let _worktree_info = git.get_worktree_info(&worktree_path)?;
 
     // シンボリックリンクを作成
     if !config.settings.files.is_empty() {
@@ -62,10 +113,12 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         println!("{}", worktree_path.display());
     } else if args.cd_command {
         println!("cd \"{}\"", worktree_path.display());
-    } else {
-        println!("✓ Worktree '{}' を作成しました", branch_name);
-        println!("  Path: {}", worktree_path.display());
-        println!("  Branch: {}", worktree_info.branch);
+    } else if !args.quiet {
+        // git worktreeの出力をそのまま表示
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        if !config.settings.files.is_empty() {
+            println!("✓ シンボリックリンクを作成しました");
+        }
     }
 
     Ok(())
