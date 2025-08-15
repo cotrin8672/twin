@@ -1,6 +1,6 @@
 use crate::cli::output::OutputFormatter;
 use crate::cli::*;
-use crate::core::{Config, TwinResult};
+use crate::core::{Config, TwinResult, TwinError};
 
 // 後方互換性のためのcreateコマンドハンドラー
 pub async fn handle_create(args: AddArgs) -> TwinResult<()> {
@@ -10,6 +10,7 @@ pub async fn handle_create(args: AddArgs) -> TwinResult<()> {
 pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     use crate::git::GitManager;
     use crate::symlink::create_symlink_manager;
+    use crate::hooks::{HookExecutor, HookType, HookContext};
 
     // 設定を読み込む
     let config = if let Some(config_path) = &args.config {
@@ -104,6 +105,47 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         return Ok(());
     }
 
+    // ブランチ名を決定（指定されている場合はそれを使用、なければパスから推測）
+    let branch_name = args.new_branch.as_ref()
+        .or(args.force_branch.as_ref())
+        .or(args.branch.as_ref())
+        .cloned()
+        .unwrap_or_else(|| {
+            // ブランチ名が指定されていない場合は、パスの最後の部分を使用
+            args.path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("worktree")
+                .to_string()
+        });
+
+    // フック実行の準備
+    let hook_executor = HookExecutor::new();
+    let hook_context = HookContext::new(
+        branch_name.clone(), // agent_nameの代わりにブランチ名を使用
+        worktree_path.clone(),
+        branch_name.clone(),
+        git.get_repo_path().to_path_buf(),
+    );
+
+    // pre_createフックを実行
+    if !config.settings.hooks.pre_create.is_empty() {
+        for hook in &config.settings.hooks.pre_create {
+            match hook_executor.execute(HookType::PreCreate, hook, &hook_context) {
+                Ok(result) => {
+                    if !result.success && !hook.continue_on_error {
+                        return Err(TwinError::hook(
+                            format!("Pre-create hook failed: {}", hook.command),
+                            "pre_create",
+                            result.exit_code,
+                        ));
+                    }
+                }
+                Err(e) if !hook.continue_on_error => return Err(e),
+                Err(e) => eprintln!("Warning: Pre-create hook failed: {}", e),
+            }
+        }
+    }
+
     // 通常モード: git worktreeを実行して副作用を適用
     let output = git.add_worktree_with_options(&worktree_args)?;
     let _worktree_info = git.get_worktree_info(&worktree_path)?;
@@ -179,6 +221,21 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         }
     }
 
+    // post_createフックを実行
+    if !config.settings.hooks.post_create.is_empty() {
+        for hook in &config.settings.hooks.post_create {
+            match hook_executor.execute(HookType::PostCreate, hook, &hook_context) {
+                Ok(result) => {
+                    if !result.success && !hook.continue_on_error {
+                        eprintln!("Error: Post-create hook failed: {}", hook.command);
+                        // post_createで失敗してもworktreeは既に作成済みなので、警告のみ
+                    }
+                }
+                Err(e) => eprintln!("Warning: Post-create hook failed: {}", e),
+            }
+        }
+    }
+
     // パス表示やcdコマンド表示の処理
     if args.print_path {
         println!("{}", worktree_path.display());
@@ -211,6 +268,7 @@ pub async fn handle_list(args: ListArgs) -> TwinResult<()> {
 pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
     use crate::git::GitManager;
     use crate::symlink::create_symlink_manager;
+    use crate::hooks::{HookExecutor, HookType, HookContext};
     use std::path::PathBuf;
 
     // Worktreeのパスかブランチ名で削除
@@ -246,13 +304,48 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
         }
     }
 
-    // シンボリックリンクを削除（副作用のクリーンアップ）
     // 設定を読み込む
     let config = if let Some(config_path) = &args.config {
         Config::from_path(config_path)?
     } else {
         Config::new()
     };
+
+    // フック実行の準備（削除時はブランチ名かパス名を使用）
+    let branch_name = worktree.map(|w| w.branch.clone())
+        .unwrap_or_else(|| path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("worktree")
+            .to_string());
+
+    let hook_executor = HookExecutor::new();
+    let hook_context = HookContext::new(
+        branch_name.clone(),
+        path.clone(),
+        branch_name.clone(),
+        git.get_repo_path().to_path_buf(),
+    );
+
+    // pre_removeフックを実行
+    if !config.settings.hooks.pre_remove.is_empty() && !args.git_only {
+        for hook in &config.settings.hooks.pre_remove {
+            match hook_executor.execute(HookType::PreRemove, hook, &hook_context) {
+                Ok(result) => {
+                    if !result.success && !hook.continue_on_error {
+                        return Err(TwinError::hook(
+                            format!("Pre-remove hook failed: {}", hook.command),
+                            "pre_remove",
+                            result.exit_code,
+                        ));
+                    }
+                }
+                Err(e) if !hook.continue_on_error => return Err(e),
+                Err(e) => eprintln!("Warning: Pre-remove hook failed: {}", e),
+            }
+        }
+    }
+
+    // シンボリックリンクを削除（副作用のクリーンアップ）
 
     if !config.settings.files.is_empty() && !args.git_only {
         let symlink_manager = create_symlink_manager();
@@ -292,6 +385,22 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
 
     // git worktree remove を実行
     git.remove_worktree(&path, args.force)?;
+    
+    // post_removeフックを実行
+    if !config.settings.hooks.post_remove.is_empty() && !args.git_only {
+        for hook in &config.settings.hooks.post_remove {
+            match hook_executor.execute(HookType::PostRemove, hook, &hook_context) {
+                Ok(result) => {
+                    if !result.success && !hook.continue_on_error {
+                        eprintln!("Error: Post-remove hook failed: {}", hook.command);
+                        // post_removeで失敗してもworktreeは既に削除済みなので、警告のみ
+                    }
+                }
+                Err(e) => eprintln!("Warning: Post-remove hook failed: {}", e),
+            }
+        }
+    }
+    
     println!("✓ Worktree '{}' を削除しました", path.display());
 
     Ok(())

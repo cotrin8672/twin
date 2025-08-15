@@ -224,7 +224,7 @@ impl HookExecutor {
             }
 
             // エラー時の処理
-            if !self.continue_on_error {
+            if !hook.continue_on_error {
                 return Err(TwinError::hook(
                     format!("{} hook failed: {}", hook_type.as_str(), expanded_command),
                     hook_type.as_str().to_string(),
@@ -250,7 +250,7 @@ impl HookExecutor {
         for hook in hooks {
             match self.execute(hook_type, hook, context) {
                 Ok(result) => {
-                    let should_stop = !result.success && !self.continue_on_error;
+                    let should_stop = !result.success && !hook.continue_on_error;
                     results.push(result);
 
                     if should_stop {
@@ -258,7 +258,7 @@ impl HookExecutor {
                     }
                 }
                 Err(e) => {
-                    if !self.continue_on_error {
+                    if !hook.continue_on_error {
                         return Err(e);
                     }
                     warn!("Hook execution error (continuing): {}", e);
@@ -320,7 +320,14 @@ impl HookExecutor {
         cmd.arg(&full_command);
 
         // 作業ディレクトリを設定
-        cmd.current_dir(&context.worktree_path);
+        // pre_createやpre_removeの場合、worktreeがまだ存在しない可能性があるため、
+        // 存在しない場合はプロジェクトルートを使用
+        let work_dir = if context.worktree_path.exists() {
+            &context.worktree_path
+        } else {
+            &context.project_root
+        };
+        cmd.current_dir(work_dir);
 
         // 環境変数を設定
         for (key, value) in context.as_env_vars() {
