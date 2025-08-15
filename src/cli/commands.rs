@@ -20,7 +20,7 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
 
     // git worktree addの引数を構築
     let mut worktree_args = Vec::new();
-    
+
     // オプションを追加
     if let Some(branch) = &args.new_branch {
         worktree_args.push("-b");
@@ -54,11 +54,11 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     if args.quiet {
         worktree_args.push("--quiet");
     }
-    
+
     // パスを追加
     let path_str = args.path.to_string_lossy();
     worktree_args.push(&path_str);
-    
+
     // ブランチ/コミットを追加
     let branch_str;
     if let Some(branch) = &args.branch {
@@ -66,16 +66,35 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         worktree_args.push(&branch_str);
     }
 
-    // worktreeのパスを決定
+    // worktreeのパスを決定（正規化して絶対パスに）
     let worktree_path = if args.path.is_relative() {
-        std::env::current_dir()?.join(&args.path)
+        std::env::current_dir()?
+            .join(&args.path)
+            .canonicalize()
+            .unwrap_or_else(|_| {
+                // canonicalizeが失敗した場合（まだ存在しないパスの場合）
+                let cwd = std::env::current_dir().unwrap();
+                let mut result = cwd.clone();
+                for component in args.path.components() {
+                    match component {
+                        std::path::Component::ParentDir => {
+                            result.pop();
+                        }
+                        std::path::Component::Normal(name) => {
+                            result.push(name);
+                        }
+                        _ => {}
+                    }
+                }
+                result
+            })
     } else {
         args.path.clone()
     };
 
     // Git worktreeを作成
     let mut git = GitManager::new(std::path::Path::new("."))?;
-    
+
     // git_onlyモードの場合は副作用をスキップ
     if args.git_only {
         let output = git.add_worktree_with_options(&worktree_args)?;
@@ -84,27 +103,79 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         }
         return Ok(());
     }
-    
+
     // 通常モード: git worktreeを実行して副作用を適用
     let output = git.add_worktree_with_options(&worktree_args)?;
     let _worktree_info = git.get_worktree_info(&worktree_path)?;
 
-    // シンボリックリンクを作成
-    if !config.settings.files.is_empty() {
+    // シンボリックリンクを作成（副作用）
+    if !config.settings.files.is_empty() && !args.git_only {
         let symlink_manager = create_symlink_manager();
         let repo_root = git.get_repo_path();
+        let mut failed_links = Vec::new();
 
         for mapping in &config.settings.files {
-            let source = repo_root.join(&mapping.path);
+            // ソースは絶対パスに変換（repo_rootが"."の場合は現在のディレクトリを使用）
+            let source = if repo_root == std::path::Path::new(".") {
+                std::env::current_dir()?.join(&mapping.path)
+            } else if repo_root.is_absolute() {
+                repo_root.join(&mapping.path)
+            } else {
+                std::env::current_dir()?
+                    .join(&repo_root)
+                    .join(&mapping.path)
+            };
             let target = worktree_path.join(&mapping.path);
+
+            // ソースファイルが存在しない場合はスキップ
+            if !source.exists() {
+                eprintln!(
+                    "⚠️  Warning: Source file not found, skipping: {}",
+                    source.display()
+                );
+                failed_links.push(mapping.path.clone());
+                continue;
+            }
 
             // ターゲットディレクトリを作成
             if let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent)?;
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    eprintln!(
+                        "⚠️  Warning: Failed to create directory {}: {}",
+                        parent.display(),
+                        e
+                    );
+                    failed_links.push(mapping.path.clone());
+                    continue;
+                }
             }
 
-            // シンボリックリンクを作成
-            symlink_manager.create_symlink(&source, &target)?;
+            // シンボリックリンクを作成（エラー時は警告を表示して継続）
+            match symlink_manager.create_symlink(&source, &target) {
+                Ok(_) => {
+                    if !args.quiet {
+                        eprintln!(
+                            "✓ Created symlink: {} -> {}",
+                            target.display(),
+                            source.display()
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "⚠️  Warning: Failed to create symlink for {}: {}",
+                        mapping.path.display(),
+                        e
+                    );
+                    failed_links.push(mapping.path.clone());
+                }
+            }
+        }
+
+        // 失敗したリンクがある場合の警告
+        if !failed_links.is_empty() && !args.quiet {
+            eprintln!("⚠️  {} symlink(s) could not be created", failed_links.len());
+            eprintln!("   The worktree was created successfully, but some symlinks failed.");
         }
     }
 
@@ -139,6 +210,7 @@ pub async fn handle_list(args: ListArgs) -> TwinResult<()> {
 
 pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
     use crate::git::GitManager;
+    use crate::symlink::create_symlink_manager;
     use std::path::PathBuf;
 
     // Worktreeのパスかブランチ名で削除
@@ -171,6 +243,50 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
         if !input.trim().eq_ignore_ascii_case("y") {
             println!("削除をキャンセルしました");
             return Ok(());
+        }
+    }
+
+    // シンボリックリンクを削除（副作用のクリーンアップ）
+    // 設定を読み込む
+    let config = if let Some(config_path) = &args.config {
+        Config::from_path(config_path)?
+    } else {
+        Config::new()
+    };
+
+    if !config.settings.files.is_empty() && !args.git_only {
+        let symlink_manager = create_symlink_manager();
+        let mut failed_cleanups = Vec::new();
+
+        for mapping in &config.settings.files {
+            let target = path.join(&mapping.path);
+
+            // シンボリックリンクが存在する場合のみ削除
+            if target.exists() || target.is_symlink() {
+                match symlink_manager.remove_symlink(&target) {
+                    Ok(_) => {
+                        if !args.quiet {
+                            eprintln!("✓ Removed symlink: {}", target.display());
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "⚠️  Warning: Failed to remove symlink {}: {}",
+                            target.display(),
+                            e
+                        );
+                        failed_cleanups.push(mapping.path.clone());
+                    }
+                }
+            }
+        }
+
+        if !failed_cleanups.is_empty() && !args.quiet {
+            eprintln!(
+                "⚠️  {} symlink(s) could not be removed",
+                failed_cleanups.len()
+            );
+            eprintln!("   Proceeding with worktree removal anyway.");
         }
     }
 

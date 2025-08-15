@@ -8,6 +8,7 @@
 use crate::core::{SymlinkInfo, TwinError, TwinResult};
 use std::fs;
 use std::path::Path;
+#[cfg(windows)]
 use std::process::Command;
 
 /// リンク作成の戦略
@@ -213,36 +214,6 @@ impl WindowsSymlinkManager {
             .unwrap_or(false)
     }
 
-    /// mklinkコマンドを実行
-    fn execute_mklink(&self, source: &Path, target: &Path, is_dir: bool) -> TwinResult<()> {
-        let mut cmd = Command::new("cmd");
-        cmd.arg("/c");
-
-        let mklink_args = if is_dir {
-            format!(
-                "mklink /D \"{}\" \"{}\"",
-                target.display(),
-                source.display()
-            )
-        } else {
-            format!("mklink \"{}\" \"{}\"", target.display(), source.display())
-        };
-
-        cmd.arg(&mklink_args);
-
-        let output = cmd.output()?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(TwinError::symlink(
-                format!("mklink failed: {}", stderr),
-                Some(target.to_path_buf()),
-            ));
-        }
-
-        Ok(())
-    }
-
     /// ファイルをコピー
     fn copy_file(&self, source: &Path, target: &Path) -> TwinResult<()> {
         if let Some(parent) = target.parent() {
@@ -289,7 +260,26 @@ impl SymlinkManager for WindowsSymlinkManager {
                     eprintln!("⚠️  Falling back to file copy instead");
                     self.copy_file(source, target)
                 } else {
-                    self.execute_mklink(source, target, source.is_dir())
+                    // 標準ライブラリのAPI を使用
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::fs::{symlink_dir, symlink_file};
+                        if source.is_dir() {
+                            symlink_dir(source, target).map_err(|e| {
+                                TwinError::symlink(
+                                    format!("Failed to create directory symlink: {}", e),
+                                    Some(target.to_path_buf()),
+                                )
+                            })
+                        } else {
+                            symlink_file(source, target).map_err(|e| {
+                                TwinError::symlink(
+                                    format!("Failed to create file symlink: {}", e),
+                                    Some(target.to_path_buf()),
+                                )
+                            })
+                        }
+                    }
                 }
             }
             LinkStrategy::Copy => self.copy_file(source, target),

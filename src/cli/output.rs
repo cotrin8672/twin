@@ -1,9 +1,7 @@
-#![allow(clippy::all)]
+//! CLIの出力フォーマット機能
 use anyhow::{Result, anyhow};
-use chrono::{DateTime, Local, Utc};
 use std::path::Path;
 
-use crate::core::{AgentEnvironment, EnvironmentStatus};
 use crate::git::WorktreeInfo;
 
 /// 出力フォーマッタークラス
@@ -12,14 +10,10 @@ pub struct OutputFormatter {
 }
 
 impl OutputFormatter {
+    /// 新しいフォーマッターを作成
     pub fn new(format_str: &str) -> Self {
         let format = OutputFormat::from_str(format_str).unwrap_or(OutputFormat::Table);
         Self { format }
-    }
-
-    pub fn format_environments(&self, environments: &[AgentEnvironment]) -> Result<()> {
-        let env_refs: Vec<&AgentEnvironment> = environments.iter().collect();
-        format_environments(&env_refs, &self.format, None)
     }
 
     pub fn format_worktrees(&self, worktrees: &[WorktreeInfo]) -> Result<()> {
@@ -27,8 +21,8 @@ impl OutputFormatter {
     }
 }
 
-/// 出力フォーマットの種類
-#[derive(Debug, Clone)]
+/// 出力フォーマット
+#[derive(Debug, Clone, PartialEq)]
 pub enum OutputFormat {
     Table,
     Json,
@@ -41,129 +35,30 @@ impl OutputFormat {
             "table" => Ok(OutputFormat::Table),
             "json" => Ok(OutputFormat::Json),
             "simple" => Ok(OutputFormat::Simple),
-            _ => Err(anyhow!(
-                "Invalid output format: {}. Use 'table', 'json', or 'simple'",
-                s
-            )),
+            _ => Err(anyhow!("Invalid output format: {}", s)),
         }
     }
-}
-
-/// 環境一覧を指定されたフォーマットで出力
-pub fn format_environments(
-    environments: &[&AgentEnvironment],
-    format: &OutputFormat,
-    active_name: Option<&str>,
-) -> Result<()> {
-    match format {
-        OutputFormat::Table => format_table(environments, active_name),
-        OutputFormat::Json => format_json(environments),
-        OutputFormat::Simple => format_simple(environments, active_name),
-    }
-}
-
-/// テーブル形式で出力
-fn format_table(environments: &[&AgentEnvironment], active_name: Option<&str>) -> Result<()> {
-    if environments.is_empty() {
-        println!("No environments found.");
-        return Ok(());
-    }
-
-    // ヘッダー
-    println!(
-        "{:<2} {:<15} {:<20} {:<12} {:<10}",
-        "", "Name", "Branch", "Created", "Status"
-    );
-    println!("{}", "-".repeat(65));
-
-    // 環境一覧
-    for env in environments {
-        let active_marker = if Some(env.name.as_str()) == active_name {
-            "*"
-        } else {
-            " "
-        };
-        let created = format_datetime(&env.created_at);
-        let status = format_status(&env.status);
-
-        println!(
-            "{:<2} {:<15} {:<20} {:<12} {:<10}",
-            active_marker, env.name, env.branch, created, status
-        );
-    }
-
-    println!();
-    if let Some(active) = active_name {
-        println!("* Active environment: {}", active);
-    }
-
-    Ok(())
-}
-
-/// JSON形式で出力
-fn format_json(environments: &[&AgentEnvironment]) -> Result<()> {
-    let json = serde_json::to_string_pretty(environments)?;
-    println!("{}", json);
-    Ok(())
-}
-
-/// シンプル形式で出力
-fn format_simple(environments: &[&AgentEnvironment], active_name: Option<&str>) -> Result<()> {
-    for env in environments {
-        let active_marker = if Some(env.name.as_str()) == active_name {
-            " (active)"
-        } else {
-            ""
-        };
-        println!("{}{}", env.name, active_marker);
-    }
-    Ok(())
 }
 
 /// パス出力（cdコマンド用）
 #[allow(dead_code)]
 pub fn format_path_output(path: &Path, show_cd_command: bool) -> Result<()> {
     if show_cd_command {
-        // シェル検出
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+        // cdコマンドとして出力
+        let path_str = path.to_string_lossy();
 
-        if shell.contains("fish") {
-            println!("cd '{}'", path.display());
-        } else if shell.contains("zsh") || shell.contains("bash") {
-            println!("cd '{}'", path.display());
+        // パスにスペースが含まれる場合はクォートで囲む
+        if path_str.contains(' ') {
+            println!("cd \"{}\"", path_str);
         } else {
-            // デフォルト
-            println!("cd '{}'", path.display());
+            println!("cd {}", path_str);
         }
-
-        println!();
-        println!("To change directory, run:");
-        println!(
-            "  $(twin switch {} --cd-command)",
-            path.file_name().unwrap_or_default().to_string_lossy()
-        );
     } else {
-        println!("{}", path.display());
+        // パスのみ出力
+        println!("{}", path.to_string_lossy());
     }
 
     Ok(())
-}
-
-/// 日時をフォーマット
-fn format_datetime(dt: &DateTime<Utc>) -> String {
-    let local: DateTime<Local> = dt.with_timezone(&Local);
-    local.format("%m/%d %H:%M").to_string()
-}
-
-/// ステータスをフォーマット
-fn format_status(status: &EnvironmentStatus) -> String {
-    match status {
-        EnvironmentStatus::Active => "Active".to_string(),
-        EnvironmentStatus::Inactive => "Inactive".to_string(),
-        EnvironmentStatus::Creating => "Creating".to_string(),
-        EnvironmentStatus::Removing => "Removing".to_string(),
-        EnvironmentStatus::Error(msg) => format!("Error: {}", msg),
-    }
 }
 
 /// Worktree一覧を指定されたフォーマットで出力
@@ -175,7 +70,7 @@ pub fn format_worktrees(worktrees: &[WorktreeInfo], format: &OutputFormat) -> Re
     }
 }
 
-/// Worktree一覧をテーブル形式で出力
+/// Worktreeをテーブル形式で出力
 fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
     if worktrees.is_empty() {
         println!("No worktrees found.");
@@ -183,45 +78,45 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
     }
 
     // ヘッダー
-    println!("{:<30} {:<30} {:<12}", "Path", "Branch", "HEAD");
-    println!("{}", "-".repeat(75));
+    println!("{:<20} {:<15} {:<50}", "Branch", "Status", "Path");
+    println!("{}", "-".repeat(85));
 
-    // 各worktreeを出力
-    for worktree in worktrees {
-        let path = worktree.path.display().to_string();
-        let path_short = if path.len() > 29 {
-            format!("...{}", &path[path.len() - 26..])
+    // Worktree一覧
+    for wt in worktrees {
+        let status = if wt.locked {
+            "locked"
+        } else if wt.prunable {
+            "prunable"
         } else {
-            path
+            "normal"
         };
 
         println!(
-            "{:<30} {:<30} {:<12}",
-            path_short,
-            worktree.branch,
-            &worktree.commit[..8.min(worktree.commit.len())]
+            "{:<20} {:<15} {:<50}",
+            if wt.branch.is_empty() { "(no branch)" } else { &wt.branch },
+            status,
+            wt.path.to_string_lossy()
         );
     }
 
     Ok(())
 }
 
-/// Worktree一覧をJSON形式で出力
+/// WorktreeをJSON形式で出力
 fn format_worktrees_json(worktrees: &[WorktreeInfo]) -> Result<()> {
     let json = serde_json::to_string_pretty(worktrees)?;
     println!("{}", json);
     Ok(())
 }
 
-/// Worktree一覧をシンプル形式で出力
+/// Worktreeをシンプル形式で出力
 fn format_worktrees_simple(worktrees: &[WorktreeInfo]) -> Result<()> {
-    for worktree in worktrees {
-        println!(
-            "{} {} {}",
-            worktree.path.display(),
-            worktree.branch,
-            worktree.commit
-        );
+    for wt in worktrees {
+        if wt.branch.is_empty() {
+            println!("(no branch)");
+        } else {
+            println!("{}", wt.branch);
+        }
     }
     Ok(())
 }
@@ -229,8 +124,6 @@ fn format_worktrees_simple(worktrees: &[WorktreeInfo]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::AgentEnvironment;
-    use std::path::PathBuf;
 
     #[test]
     fn test_output_format_from_str() {
@@ -250,18 +143,6 @@ mod tests {
     }
 
     #[test]
-    fn test_format_status() {
-        assert_eq!(format_status(&EnvironmentStatus::Active), "Active");
-        assert_eq!(format_status(&EnvironmentStatus::Inactive), "Inactive");
-        assert_eq!(format_status(&EnvironmentStatus::Creating), "Creating");
-        assert_eq!(format_status(&EnvironmentStatus::Removing), "Removing");
-        assert_eq!(
-            format_status(&EnvironmentStatus::Error("test".to_string())),
-            "Error: test"
-        );
-    }
-
-    #[test]
     fn test_output_format_from_str_case_insensitive() {
         assert!(matches!(
             OutputFormat::from_str("TABLE"),
@@ -278,94 +159,11 @@ mod tests {
     }
 
     #[test]
-    fn test_format_table_empty() {
-        let environments: Vec<&AgentEnvironment> = vec![];
-        let result = format_table(&environments, None);
-
-        assert!(result.is_ok());
-        // 空の時は "No environments found." が出力される
-    }
-
-    #[test]
-    fn test_format_json_empty() {
-        let environments: Vec<&AgentEnvironment> = vec![];
-        let result = format_json(&environments);
-
-        assert!(result.is_ok());
-        // JSON形式では空配列 [] が出力される
-    }
-
-    #[test]
-    fn test_format_simple_empty() {
-        let environments: Vec<&AgentEnvironment> = vec![];
-        let result = format_simple(&environments, None);
-
-        assert!(result.is_ok());
-        // シンプル形式では何も出力されない
-    }
-
-    #[test]
-    fn test_format_datetime_formatting() {
-        use chrono::{TimeZone, Utc};
-
-        // 2024年1月15日 14:30:00 UTC
-        let dt = Utc.with_ymd_and_hms(2024, 1, 15, 14, 30, 0).unwrap();
-        let formatted = format_datetime(&dt);
-
-        // フォーマットは "MM/DD HH:MM" 形式
-        // ローカルタイムゾーンに依存するため、形式のみチェック
-        assert!(formatted.contains("/"));
-        assert!(formatted.contains(":"));
-        assert!(formatted.len() >= 11); // "01/15 14:30" の最小長
-    }
-
-    #[test]
     fn test_output_formatter_new() {
         let _formatter = OutputFormatter::new("table");
         // OutputFormatterがTableフォーマットで作成される
 
         let _formatter_invalid = OutputFormatter::new("invalid");
         // 無効な形式の場合はデフォルト（Table）にフォールバック
-    }
-
-    #[test]
-    fn test_format_environments_with_data() {
-        use chrono::Utc;
-
-        let env1 = AgentEnvironment {
-            name: "test1".to_string(),
-            branch: "feature/test1".to_string(),
-            worktree_path: PathBuf::from("/tmp/test1"),
-            symlinks: vec![],
-            status: EnvironmentStatus::Active,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            config_path: None,
-        };
-
-        let env2 = AgentEnvironment {
-            name: "test2".to_string(),
-            branch: "feature/test2".to_string(),
-            worktree_path: PathBuf::from("/tmp/test2"),
-            symlinks: vec![],
-            status: EnvironmentStatus::Inactive,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            config_path: None,
-        };
-
-        let environments = vec![&env1, &env2];
-
-        // Table形式
-        let result_table = format_table(&environments, Some("test1"));
-        assert!(result_table.is_ok());
-
-        // JSON形式
-        let result_json = format_json(&environments);
-        assert!(result_json.is_ok());
-
-        // Simple形式
-        let result_simple = format_simple(&environments, Some("test1"));
-        assert!(result_simple.is_ok());
     }
 }

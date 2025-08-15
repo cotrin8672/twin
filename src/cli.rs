@@ -124,6 +124,18 @@ pub struct RemoveArgs {
     /// 確認なしで強制削除
     #[arg(short, long)]
     pub force: bool,
+
+    /// 設定ファイルのパス
+    #[arg(short, long, value_name = "FILE")]
+    pub config: Option<PathBuf>,
+
+    /// git worktree removeのみ実行（副作用をスキップ）
+    #[arg(long)]
+    pub git_only: bool,
+
+    /// 出力を抑制
+    #[arg(short, long)]
+    pub quiet: bool,
 }
 
 /// configコマンドの引数

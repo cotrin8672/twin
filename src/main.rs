@@ -1,7 +1,6 @@
 mod cli;
 mod config;
 mod core;
-mod environment;
 mod git;
 mod hooks;
 mod symlink;
