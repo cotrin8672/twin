@@ -5,7 +5,14 @@ use tempfile::TempDir;
 
 /// twinバイナリのパスを取得
 fn get_twin_binary() -> PathBuf {
-    let path = PathBuf::from("target/debug/twin.exe");
+    // OSに応じて適切なバイナリ名を選択
+    let binary_name = if cfg!(windows) {
+        "twin.exe"
+    } else {
+        "twin"
+    };
+    
+    let path = PathBuf::from(format!("target/debug/{}", binary_name));
     if !path.exists() {
         panic!("twin binary not found. Run 'cargo build' first.");
     }
