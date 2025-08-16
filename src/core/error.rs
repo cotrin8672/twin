@@ -158,7 +158,7 @@ impl From<anyhow::Error> for TwinError {
 impl From<toml::de::Error> for TwinError {
     fn from(err: toml::de::Error) -> Self {
         Self::Config {
-            message: format!("Failed to parse TOML: {}", err),
+            message: format!("Failed to parse TOML: {err}"),
             path: None,
             source: Some(Box::new(err)),
         }
@@ -169,7 +169,7 @@ impl From<toml::de::Error> for TwinError {
 impl From<toml::ser::Error> for TwinError {
     fn from(err: toml::ser::Error) -> Self {
         Self::Config {
-            message: format!("Failed to serialize TOML: {}", err),
+            message: format!("Failed to serialize TOML: {err}"),
             path: None,
             source: Some(Box::new(err)),
         }
@@ -180,7 +180,7 @@ impl From<toml::ser::Error> for TwinError {
 impl From<serde_json::Error> for TwinError {
     fn from(err: serde_json::Error) -> Self {
         Self::Config {
-            message: format!("Failed to parse/serialize JSON: {}", err),
+            message: format!("Failed to parse/serialize JSON: {err}"),
             path: None,
             source: Some(Box::new(err)),
         }

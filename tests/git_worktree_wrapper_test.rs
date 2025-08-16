@@ -23,7 +23,7 @@ fn setup_test_repo() -> TempDir {
         .current_dir(dir.path())
         .output()
         .expect("Failed to set git user name");
-    
+
     Command::new("git")
         .args(["config", "user.email", "test@example.com"])
         .current_dir(dir.path())
@@ -153,10 +153,7 @@ fn test_force_branch_option() {
         .output()
         .expect("Failed to execute twin add");
 
-    assert!(
-        output.status.success(),
-        "twin add with -B should succeed"
-    );
+    assert!(output.status.success(), "twin add with -B should succeed");
 }
 
 #[test]
@@ -233,13 +230,7 @@ fn test_no_checkout_option() {
 
     // --no-checkoutオプションでworktreeを作成
     let output = Command::new(&twin)
-        .args([
-            "add",
-            &worktree_path,
-            "-b",
-            "empty-branch",
-            "--no-checkout",
-        ])
+        .args(["add", &worktree_path, "-b", "empty-branch", "--no-checkout"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to execute twin add");
@@ -330,7 +321,7 @@ fn test_error_message_passthrough() {
 
     // 既に存在するブランチで同じパスにworktreeを作成しようとする（エラーになる）
     let worktree_path = unique_worktree_path("error");
-    
+
     // 最初のworktreeを作成
     Command::new(&twin)
         .args(["add", &worktree_path, "-b", "test-branch"])
@@ -349,7 +340,9 @@ fn test_error_message_passthrough() {
 
     // gitのエラーメッセージが表示されることを確認
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Error") || stderr.contains("fatal") || stderr.contains("already exists"));
+    assert!(
+        stderr.contains("Error") || stderr.contains("fatal") || stderr.contains("already exists")
+    );
 }
 
 #[test]

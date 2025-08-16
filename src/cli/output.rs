@@ -1,5 +1,5 @@
 //! CLIの出力フォーマット機能
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::path::Path;
 
 use crate::git::WorktreeInfo;
@@ -49,9 +49,9 @@ pub fn format_path_output(path: &Path, show_cd_command: bool) -> Result<()> {
 
         // パスにスペースが含まれる場合はクォートで囲む
         if path_str.contains(' ') {
-            println!("cd \"{}\"", path_str);
+            println!("cd \"{path_str}\"");
         } else {
-            println!("cd {}", path_str);
+            println!("cd {path_str}");
         }
     } else {
         // パスのみ出力
@@ -90,7 +90,7 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
                 false
             }
         };
-        
+
         if let Some(main_idx) = worktrees.iter().position(is_main) {
             let mut all: Vec<WorktreeInfo> = worktrees.to_vec();
             let main = all.remove(main_idx);
@@ -112,7 +112,14 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
     // メインリポジトリの表示
     if let Some(main) = main_repo {
         println!("📁 Main Repository");
-        println!("  Branch: {}", if main.branch.is_empty() { "(no branch)" } else { &main.branch });
+        println!(
+            "  Branch: {}",
+            if main.branch.is_empty() {
+                "(no branch)"
+            } else {
+                &main.branch
+            }
+        );
         println!("  Path:   {}", main.path.to_string_lossy());
         println!("  Commit: {}", &main.commit[..8.min(main.commit.len())]);
         println!();
@@ -122,9 +129,12 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
     if !work_trees.is_empty() {
         println!("🌲 Work Trees");
         println!("{}", "-".repeat(80));
-        
+
         // ヘッダー
-        println!("{:<30} {:<10} {:<12} {:<30}", "Branch", "Status", "Commit", "Path");
+        println!(
+            "{:<30} {:<10} {:<12} {:<30}",
+            "Branch", "Status", "Commit", "Path"
+        );
         println!("{}", "-".repeat(80));
 
         // Worktree一覧
@@ -137,7 +147,7 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
                 "✓ active"
             };
 
-            let branch_display = if wt.branch.is_empty() { 
+            let branch_display = if wt.branch.is_empty() {
                 "(no branch)".to_string()
             } else if wt.branch.len() > 28 {
                 format!("{}...", &wt.branch[..25])
@@ -152,7 +162,7 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
                     if let Some(file_name) = wt.path.file_name() {
                         format!(".../{}", file_name.to_string_lossy())
                     } else {
-                        format!("...{}", &path_str[path_str.len()-25..])
+                        format!("...{}", &path_str[path_str.len() - 25..])
                     }
                 } else {
                     path_str.to_string()
@@ -167,7 +177,7 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
                 path_display
             );
         }
-        
+
         println!("{}", "-".repeat(80));
         println!("Total: {} worktree(s)", work_trees.len());
     }
@@ -178,7 +188,7 @@ fn format_worktrees_table(worktrees: &[WorktreeInfo]) -> Result<()> {
 /// WorktreeをJSON形式で出力
 fn format_worktrees_json(worktrees: &[WorktreeInfo]) -> Result<()> {
     let json = serde_json::to_string_pretty(worktrees)?;
-    println!("{}", json);
+    println!("{json}");
     Ok(())
 }
 

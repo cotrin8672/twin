@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-
 /// シンボリックリンクの情報
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymlinkInfo {

@@ -70,11 +70,11 @@ impl GitManager {
         // git2ライブラリを使用してリポジトリを開く
         let repository = match git2::Repository::open(&repo_path) {
             Ok(repo) => {
-                info!("Opened Git repository at: {:?}", repo_path);
+                info!("Opened Git repository at: {repo_path:?}");
                 Some(repo)
             }
             Err(e) => {
-                warn!("Failed to open repository with git2: {}", e);
+                warn!("Failed to open repository with git2: {e}");
                 // git2で開けない場合でも、gitコマンドは使える可能性があるので続行
                 None
             }
@@ -101,7 +101,7 @@ impl GitManager {
         let output = Command::new("git")
             .arg("--version")
             .output()
-            .map_err(|e| TwinError::git(format!("Git command not found: {}", e)))?;
+            .map_err(|e| TwinError::git(format!("Git command not found: {e}")))?;
 
         if !output.status.success() {
             return Err(TwinError::git("Git command failed to execute"));
@@ -113,18 +113,18 @@ impl GitManager {
     /// gitコマンドを実行する共通メソッド
     fn execute_git_command(&mut self, args: &[&str]) -> TwinResult<Output> {
         let command_str = format!("git {}", args.join(" "));
-        info!("Executing: {}", command_str);
+        info!("Executing: {command_str}");
         self.command_history.push(command_str.clone());
 
         // 透明性のあるコマンド実行ログ
         if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
-            eprintln!("🔧 実行中: {}", command_str);
+            eprintln!("🔧 実行中: {command_str}");
         }
 
         if self.dry_run {
-            info!("[DRY RUN] Would execute: {}", command_str);
+            info!("[DRY RUN] Would execute: {command_str}");
             if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
-                eprintln!("📝 ドライラン: {}", command_str);
+                eprintln!("📝 ドライラン: {command_str}");
             }
             return Ok(Output {
                 #[cfg(unix)]
@@ -140,11 +140,11 @@ impl GitManager {
             .current_dir(&self.repo_path)
             .args(args)
             .output()
-            .map_err(|e| TwinError::git(format!("Failed to execute git command: {}", e)))?;
+            .map_err(|e| TwinError::git(format!("Failed to execute git command: {e}")))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(TwinError::git(format!("Git command failed: {}", stderr)));
+            return Err(TwinError::git(format!("Git command failed: {stderr}")));
         }
 
         Ok(output)
@@ -160,9 +160,11 @@ impl GitManager {
         let mut args = vec!["worktree", "add"];
 
         // 新しいブランチを作成する場合
-        if create_branch && let Some(b) = branch {
-            args.push("-b");
-            args.push(b);
+        if create_branch {
+            if let Some(b) = branch {
+                args.push("-b");
+                args.push(b);
+            }
         }
 
         // パスを追加
@@ -170,8 +172,10 @@ impl GitManager {
         args.push(&path_str);
 
         // 既存のブランチを指定する場合
-        if !create_branch && let Some(b) = branch {
-            args.push(b);
+        if !create_branch {
+            if let Some(b) = branch {
+                args.push(b);
+            }
         }
 
         let output = self.execute_git_command(&args)?;
@@ -195,10 +199,10 @@ impl GitManager {
     /// Gitコマンドを実行し、エラーメッセージをそのまま表示
     pub fn execute_git_command_raw(&mut self, args: &[&str]) -> TwinResult<Output> {
         let command_str = format!("git {}", args.join(" "));
-        info!("Executing: {}", command_str);
+        info!("Executing: {command_str}");
 
         if self.dry_run {
-            info!("[DRY RUN] Would execute: {}", command_str);
+            info!("[DRY RUN] Would execute: {command_str}");
             return Ok(Output {
                 #[cfg(unix)]
                 status: std::os::unix::process::ExitStatusExt::from_raw(0),
@@ -213,7 +217,7 @@ impl GitManager {
             .args(args)
             .current_dir(&self.repo_path)
             .output()
-            .map_err(|e| TwinError::git(format!("{}", e)))?;
+            .map_err(|e| TwinError::git(format!("{e}")))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -236,7 +240,7 @@ impl GitManager {
         args.push(&path_str);
 
         self.execute_git_command(&args)?;
-        info!("Worktree removed: {:?}", path);
+        info!("Worktree removed: {path:?}");
 
         Ok(())
     }
@@ -307,7 +311,7 @@ impl GitManager {
             path.to_path_buf()
         } else {
             std::env::current_dir()
-                .map_err(|e| TwinError::io(format!("Failed to get current dir: {}", e), None))?
+                .map_err(|e| TwinError::io(format!("Failed to get current dir: {e}"), None))?
                 .join(path)
         };
 
@@ -369,7 +373,7 @@ impl GitManager {
         }
 
         self.execute_git_command(&args)?;
-        info!("Branch created: {}", branch_name);
+        info!("Branch created: {branch_name}");
 
         Ok(())
     }
@@ -387,7 +391,7 @@ impl GitManager {
         args.push(branch_name);
 
         self.execute_git_command(&args)?;
-        info!("Branch deleted: {}", branch_name);
+        info!("Branch deleted: {branch_name}");
 
         Ok(())
     }
@@ -461,7 +465,7 @@ impl GitManager {
 
         // 番号付きの名前を試す
         for i in 1..=max_attempts {
-            let name = format!("{}-{}", base_name, i);
+            let name = format!("{base_name}-{i}");
             if !self.branch_exists(&name)? {
                 return Ok(name);
             }
@@ -469,14 +473,13 @@ impl GitManager {
 
         // タイムスタンプ付きの名前を生成
         let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-        let name = format!("{}-{}", base_name, timestamp);
+        let name = format!("{base_name}-{timestamp}");
 
         if !self.branch_exists(&name)? {
             Ok(name)
         } else {
             Err(TwinError::git(format!(
-                "Failed to generate unique branch name for: {}",
-                base_name
+                "Failed to generate unique branch name for: {base_name}"
             )))
         }
     }

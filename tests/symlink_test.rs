@@ -52,21 +52,19 @@ skip_if_exists = false
 #[test]
 fn test_symlink_manager_initialization() {
     // SymlinkManagerが正しく初期化されることを確認
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     let manager = create_symlink_manager();
     // マネージャーが作成されたことを確認（Boxなのでnullにはならない）
-    assert!(
-        !manager
-            .as_ref()
-            .get_manual_instructions(&PathBuf::from("a"), &PathBuf::from("b"))
-            .is_empty()
-    );
+    assert!(!manager
+        .as_ref()
+        .get_manual_instructions(&PathBuf::from("a"), &PathBuf::from("b"))
+        .is_empty());
 }
 
 #[test]
 fn test_symlink_creation_with_permission() {
-    use twin::symlink::{LinkStrategy, create_symlink_manager};
+    use twin_cli::symlink::{create_symlink_manager, LinkStrategy};
 
     let (_temp, source, target) = setup_test_workspace();
     let manager = create_symlink_manager();
@@ -105,7 +103,7 @@ fn test_symlink_creation_with_permission() {
 
 #[test]
 fn test_fallback_to_copy() {
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     let (_temp, source, target) = setup_test_workspace();
     let manager = create_symlink_manager();
@@ -123,7 +121,7 @@ fn test_fallback_to_copy() {
 
 #[test]
 fn test_symlink_removal() {
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     let (_temp, source, target) = setup_test_workspace();
     let manager = create_symlink_manager();
@@ -162,7 +160,7 @@ fn test_unix_symlink_specific() {
 #[test]
 #[cfg(windows)]
 fn test_windows_symlink_fallback() {
-    use twin::symlink::{SymlinkManager, WindowsSymlinkManager};
+    use twin_cli::symlink::{SymlinkManager, WindowsSymlinkManager};
 
     let manager = WindowsSymlinkManager::new();
     let (_temp, source, target) = setup_test_workspace();
@@ -182,7 +180,7 @@ fn test_windows_symlink_fallback() {
 
 #[test]
 fn test_multiple_file_mappings() {
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     let temp = TempDir::new().unwrap();
     let manager = create_symlink_manager();
@@ -220,7 +218,7 @@ fn test_multiple_file_mappings() {
 
 #[test]
 fn test_skip_if_exists() {
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     let (_temp, source, target) = setup_test_workspace();
     let manager = create_symlink_manager();
@@ -242,7 +240,7 @@ fn test_skip_if_exists() {
 #[test]
 fn test_environment_variable_debug_output() {
     use std::env;
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     // デバッグ出力を有効化
     unsafe {
@@ -265,7 +263,7 @@ fn test_environment_variable_debug_output() {
 
 #[test]
 fn test_invalid_source_path() {
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     let temp = TempDir::new().unwrap();
     let manager = create_symlink_manager();
@@ -280,7 +278,7 @@ fn test_invalid_source_path() {
 
 #[test]
 fn test_directory_symlink() {
-    use twin::symlink::create_symlink_manager;
+    use twin_cli::symlink::create_symlink_manager;
 
     let temp = TempDir::new().unwrap();
     let manager = create_symlink_manager();

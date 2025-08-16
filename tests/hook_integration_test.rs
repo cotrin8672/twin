@@ -1,16 +1,16 @@
 //! フック機能の統合テスト
 use std::fs;
 use std::path::PathBuf;
-use twin::cli::{AddArgs, RemoveArgs};
-use twin::cli::commands::{handle_add, handle_remove};
+use twin_cli::cli::commands::{handle_add, handle_remove};
+use twin_cli::cli::{AddArgs, RemoveArgs};
 
 mod common;
 use common::TestRepo;
 
 /// フック実行を記録するためのファイルを作成
 fn create_hook_config(_test_dir: &PathBuf) -> String {
-    
-    format!(r#"
+    format!(
+        r#"
 [[files]]
 path = ".env"
 mapping_type = "symlink"
@@ -29,7 +29,8 @@ pre_remove = [
 post_remove = [
     {{ command = "echo", args = ["post_remove: {{{{branch}}}}"] }}
 ]
-"#)
+"#
+    )
 }
 
 #[tokio::test]
@@ -37,15 +38,15 @@ async fn test_hooks_execution_on_add() {
     let test_repo = TestRepo::new();
     let test_id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
     let config_path = test_repo.path().join(".twin.toml");
-    
+
     // フック設定を作成
     let config = create_hook_config(&test_repo.path().to_path_buf());
     fs::write(&config_path, config).unwrap();
-    
+
     // .envファイルを作成（シンボリックリンク用）
     let env_file = test_repo.path().join(".env");
     fs::write(&env_file, "TEST=value").unwrap();
-    
+
     // worktree作成
     let worktree_path = test_repo.path().join("wt-hooks");
     let args = AddArgs {
@@ -66,15 +67,19 @@ async fn test_hooks_execution_on_add() {
         print_path: false,
         cd_command: false,
     };
-    
+
     // フックが実行されることを確認（エラーが出ないこと）
     let result = handle_add(args).await;
-    assert!(result.is_ok(), "Failed to create worktree with hooks: {:?}", result.err());
-    
+    assert!(
+        result.is_ok(),
+        "Failed to create worktree with hooks: {:?}",
+        result.err()
+    );
+
     // worktreeが作成されたことを確認
     assert!(worktree_path.exists());
     assert!(worktree_path.join(".git").exists());
-    
+
     // シンボリックリンクが作成されたことを確認
     let symlink = worktree_path.join(".env");
     assert!(symlink.exists() || symlink.is_symlink());
@@ -85,15 +90,15 @@ async fn test_hooks_execution_on_remove() {
     let test_repo = TestRepo::new();
     let test_id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
     let config_path = test_repo.path().join(".twin.toml");
-    
+
     // フック設定を作成
     let config = create_hook_config(&test_repo.path().to_path_buf());
     fs::write(&config_path, config).unwrap();
-    
+
     // .envファイルを作成
     let env_file = test_repo.path().join(".env");
     fs::write(&env_file, "TEST=value").unwrap();
-    
+
     // まずworktreeを作成
     let worktree_path = test_repo.path().join("wt-remove-hooks");
     let add_args = AddArgs {
@@ -114,11 +119,11 @@ async fn test_hooks_execution_on_remove() {
         print_path: false,
         cd_command: false,
     };
-    
+
     let result = handle_add(add_args).await;
     assert!(result.is_ok());
     assert!(worktree_path.exists());
-    
+
     // worktreeを削除
     let remove_args = RemoveArgs {
         worktree: worktree_path.to_string_lossy().to_string(),
@@ -127,11 +132,15 @@ async fn test_hooks_execution_on_remove() {
         git_only: false,
         quiet: false,
     };
-    
+
     // フックが実行されることを確認
     let result = handle_remove(remove_args).await;
-    assert!(result.is_ok(), "Failed to remove worktree with hooks: {:?}", result.err());
-    
+    assert!(
+        result.is_ok(),
+        "Failed to remove worktree with hooks: {:?}",
+        result.err()
+    );
+
     // worktreeが削除されたことを確認
     assert!(!worktree_path.exists());
 }
@@ -141,7 +150,7 @@ async fn test_hook_continue_on_error() {
     let test_repo = TestRepo::new();
     let test_id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
     let config_path = test_repo.path().join(".twin.toml");
-    
+
     // エラーが出るフックだが、continue_on_error=trueなので続行する設定
     let config = r#"
 [hooks]
@@ -151,7 +160,7 @@ pre_create = [
 ]
 "#;
     fs::write(&config_path, config).unwrap();
-    
+
     let worktree_path = test_repo.path().join("wt-error-continue");
     let args = AddArgs {
         path: worktree_path.clone(),
@@ -171,7 +180,7 @@ pre_create = [
         print_path: false,
         cd_command: false,
     };
-    
+
     // continue_on_error=trueなのでworktree作成は成功するはず
     let result = handle_add(args).await;
     assert!(result.is_ok(), "Should continue despite hook error");
@@ -181,9 +190,9 @@ pre_create = [
 #[tokio::test]
 async fn test_hook_fail_on_error() {
     let test_repo = TestRepo::new();
-    let test_id = uuid::Uuid::new_v4().to_string()[0..8].to_string(); 
+    let test_id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
     let config_path = test_repo.path().join(".twin.toml");
-    
+
     // エラーが出るフックで、continue_on_error=falseなので中断する設定
     let config = r#"
 [hooks]
@@ -192,7 +201,7 @@ pre_create = [
 ]
 "#;
     fs::write(&config_path, config).unwrap();
-    
+
     let worktree_path = test_repo.path().join("wt-error-fail");
     let args = AddArgs {
         path: worktree_path.clone(),
@@ -212,9 +221,12 @@ pre_create = [
         print_path: false,
         cd_command: false,
     };
-    
+
     // フックが失敗してworktree作成も失敗するはず
     let result = handle_add(args).await;
-    assert!(result.is_err(), "Should fail when hook fails and continue_on_error=false");
+    assert!(
+        result.is_err(),
+        "Should fail when hook fails and continue_on_error=false"
+    );
     assert!(!worktree_path.exists());
 }

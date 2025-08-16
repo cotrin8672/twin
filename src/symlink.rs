@@ -283,14 +283,14 @@ impl SymlinkManager for WindowsSymlinkManager {
                         if source.is_dir() {
                             symlink_dir(source, target).map_err(|e| {
                                 TwinError::symlink(
-                                    format!("Failed to create directory symlink: {}", e),
+                                    format!("Failed to create directory symlink: {e}"),
                                     Some(target.to_path_buf()),
                                 )
                             })
                         } else {
                             symlink_file(source, target).map_err(|e| {
                                 TwinError::symlink(
-                                    format!("Failed to create file symlink: {}", e),
+                                    format!("Failed to create file symlink: {e}"),
                                     Some(target.to_path_buf()),
                                 )
                             })
@@ -313,7 +313,7 @@ impl SymlinkManager for WindowsSymlinkManager {
             }
             Err(e) => {
                 if std::env::var("TWIN_VERBOSE").is_ok() || std::env::var("TWIN_DEBUG").is_ok() {
-                    eprintln!("❌ シンボリックリンク作成失敗: {}", e);
+                    eprintln!("❌ シンボリックリンク作成失敗: {e}");
                 }
                 info.set_error(e.to_string());
                 Err(e)

@@ -172,9 +172,9 @@ impl HookExecutor {
         };
 
         if self.dry_run {
-            info!("[DRY RUN] Would execute: {}", expanded_command);
+            info!("[DRY RUN] Would execute: {expanded_command}");
             if let Some(args) = &expanded_args {
-                info!("[DRY RUN] With args: {:?}", args);
+                info!("[DRY RUN] With args: {args:?}");
             }
 
             return Ok(HookResult {
@@ -261,7 +261,7 @@ impl HookExecutor {
                     if !hook.continue_on_error {
                         return Err(e);
                     }
-                    warn!("Hook execution error (continuing): {}", e);
+                    warn!("Hook execution error (continuing): {e}");
                 }
             }
         }
@@ -287,7 +287,7 @@ impl HookExecutor {
 
         // 追加の環境変数を展開
         for (key, value) in &context.env_vars {
-            result = result.replace(&format!("${{{}}}", key), value);
+            result = result.replace(&format!("${{{key}}}"), value);
         }
 
         result
@@ -334,7 +334,7 @@ impl HookExecutor {
             cmd.env(key, value);
         }
 
-        debug!("Executing command: {}", full_command);
+        debug!("Executing command: {full_command}");
         debug!("Working directory: {:?}", context.worktree_path);
 
         // タイムアウトを考慮した実行
@@ -343,7 +343,7 @@ impl HookExecutor {
             // 実際のプロダクションコードではtokio::time::timeoutなどを使用
             cmd.output().map_err(|e| {
                 TwinError::hook(
-                    format!("Failed to execute hook command: {}", e),
+                    format!("Failed to execute hook command: {e}"),
                     command.to_string(),
                     None,
                 )
@@ -351,7 +351,7 @@ impl HookExecutor {
         } else {
             cmd.output().map_err(|e| {
                 TwinError::hook(
-                    format!("Failed to execute hook command: {}", e),
+                    format!("Failed to execute hook command: {e}"),
                     command.to_string(),
                     None,
                 )

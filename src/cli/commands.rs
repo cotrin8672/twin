@@ -1,6 +1,6 @@
 use crate::cli::output::OutputFormatter;
 use crate::cli::*;
-use crate::core::{Config, TwinResult, TwinError};
+use crate::core::{Config, TwinError, TwinResult};
 
 // 後方互換性のためのcreateコマンドハンドラー
 pub async fn handle_create(args: AddArgs) -> TwinResult<()> {
@@ -9,8 +9,8 @@ pub async fn handle_create(args: AddArgs) -> TwinResult<()> {
 
 pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     use crate::git::GitManager;
+    use crate::hooks::{HookContext, HookExecutor, HookType};
     use crate::symlink::create_symlink_manager;
-    use crate::hooks::{HookExecutor, HookType, HookContext};
 
     // 設定を読み込む
     let config = if let Some(config_path) = &args.config {
@@ -106,13 +106,16 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     }
 
     // ブランチ名を決定（指定されている場合はそれを使用、なければパスから推測）
-    let branch_name = args.new_branch.as_ref()
+    let branch_name = args
+        .new_branch
+        .as_ref()
         .or(args.force_branch.as_ref())
         .or(args.branch.as_ref())
         .cloned()
         .unwrap_or_else(|| {
             // ブランチ名が指定されていない場合は、パスの最後の部分を使用
-            args.path.file_name()
+            args.path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("worktree")
                 .to_string()
@@ -141,7 +144,7 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
                     }
                 }
                 Err(e) if !hook.continue_on_error => return Err(e),
-                Err(e) => eprintln!("Warning: Pre-create hook failed: {}", e),
+                Err(e) => eprintln!("Warning: Pre-create hook failed: {e}"),
             }
         }
     }
@@ -163,9 +166,7 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
             } else if repo_root.is_absolute() {
                 repo_root.join(&mapping.path)
             } else {
-                std::env::current_dir()?
-                    .join(&repo_root)
-                    .join(&mapping.path)
+                std::env::current_dir()?.join(repo_root).join(&mapping.path)
             };
             let target = worktree_path.join(&mapping.path);
 
@@ -231,7 +232,7 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
                         // post_createで失敗してもworktreeは既に作成済みなので、警告のみ
                     }
                 }
-                Err(e) => eprintln!("Warning: Post-create hook failed: {}", e),
+                Err(e) => eprintln!("Warning: Post-create hook failed: {e}"),
             }
         }
     }
@@ -267,8 +268,8 @@ pub async fn handle_list(args: ListArgs) -> TwinResult<()> {
 
 pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
     use crate::git::GitManager;
+    use crate::hooks::{HookContext, HookExecutor, HookType};
     use crate::symlink::create_symlink_manager;
-    use crate::hooks::{HookExecutor, HookType, HookContext};
     use std::path::PathBuf;
 
     // Worktreeのパスかブランチ名で削除
@@ -312,11 +313,12 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
     };
 
     // フック実行の準備（削除時はブランチ名かパス名を使用）
-    let branch_name = worktree.map(|w| w.branch.clone())
-        .unwrap_or_else(|| path.file_name()
+    let branch_name = worktree.map(|w| w.branch.clone()).unwrap_or_else(|| {
+        path.file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("worktree")
-            .to_string());
+            .to_string()
+    });
 
     let hook_executor = HookExecutor::new();
     let hook_context = HookContext::new(
@@ -340,7 +342,7 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
                     }
                 }
                 Err(e) if !hook.continue_on_error => return Err(e),
-                Err(e) => eprintln!("Warning: Pre-remove hook failed: {}", e),
+                Err(e) => eprintln!("Warning: Pre-remove hook failed: {e}"),
             }
         }
     }
@@ -385,7 +387,7 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
 
     // git worktree remove を実行
     git.remove_worktree(&path, args.force)?;
-    
+
     // post_removeフックを実行
     if !config.settings.hooks.post_remove.is_empty() && !args.git_only {
         for hook in &config.settings.hooks.post_remove {
@@ -396,11 +398,11 @@ pub async fn handle_remove(args: RemoveArgs) -> TwinResult<()> {
                         // post_removeで失敗してもworktreeは既に削除済みなので、警告のみ
                     }
                 }
-                Err(e) => eprintln!("Warning: Post-remove hook failed: {}", e),
+                Err(e) => eprintln!("Warning: Post-remove hook failed: {e}"),
             }
         }
     }
-    
+
     println!("✓ Worktree '{}' を削除しました", path.display());
 
     Ok(())
@@ -451,7 +453,7 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
                 return Ok(());
             }
             _ => {
-                println!("不明なサブコマンド: {}", subcommand);
+                println!("不明なサブコマンド: {subcommand}");
                 return Ok(());
             }
         }
@@ -461,7 +463,7 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
         // 現在の設定を表示
         if config_path.exists() {
             let config = Config::from_path(&config_path)?;
-            println!("{:#?}", config);
+            println!("{config:#?}");
         } else {
             println!("設定ファイルが見つかりません: {}", config_path.display());
         }
@@ -482,7 +484,7 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
         // 設定値を取得
         if config_path.exists() {
             let _config = Config::from_path(&config_path)?;
-            println!("キー '{}' の値を取得します", key);
+            println!("キー '{key}' の値を取得します");
             println!("注: この機能は現在実装中です");
         } else {
             println!("設定ファイルが見つかりません: {}", config_path.display());
