@@ -11,12 +11,30 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     use crate::git::GitManager;
     use crate::hooks::{HookContext, HookExecutor, HookType};
     use crate::symlink::create_symlink_manager;
+    use std::path::PathBuf;
 
     // 設定を読み込む
     let config = if let Some(config_path) = &args.config {
         Config::from_path(config_path)?
     } else {
         Config::new()
+    };
+
+    // ワークツリーのパスを決定
+    // パスが指定されていない場合は、worktree_base設定を使用
+    let worktree_path = if let Some(path) = &args.path {
+        path.clone()
+    } else {
+        // ブランチ名からディレクトリ名を作成（スラッシュをハイフンに置換）
+        let dir_name = args.branch.replace('/', "-");
+
+        // worktree_baseが設定されていればそれを使用、なければデフォルト
+        if let Some(base) = &config.settings.worktree_base {
+            base.join(&dir_name)
+        } else {
+            // デフォルトは ./worktrees/ブランチ名
+            PathBuf::from("worktrees").join(&dir_name)
+        }
     };
 
     // git worktree addの引数を構築
@@ -57,26 +75,23 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     }
 
     // パスを追加
-    let path_str = args.path.to_string_lossy();
+    let path_str = worktree_path.to_string_lossy();
     worktree_args.push(&path_str);
 
     // ブランチ/コミットを追加
-    let branch_str;
-    if let Some(branch) = &args.branch {
-        branch_str = branch.clone();
-        worktree_args.push(&branch_str);
-    }
+    let branch_str = args.branch.clone();
+    worktree_args.push(&branch_str);
 
-    // worktreeのパスを決定（正規化して絶対パスに）
-    let worktree_path = if args.path.is_relative() {
+    // worktreeのパスを正規化（絶対パスに）
+    let worktree_path_absolute = if worktree_path.is_relative() {
         std::env::current_dir()?
-            .join(&args.path)
+            .join(&worktree_path)
             .canonicalize()
             .unwrap_or_else(|_| {
                 // canonicalizeが失敗した場合（まだ存在しないパスの場合）
                 let cwd = std::env::current_dir().unwrap();
                 let mut result = cwd.clone();
-                for component in args.path.components() {
+                for component in worktree_path.components() {
                     match component {
                         std::path::Component::ParentDir => {
                             result.pop();
@@ -90,7 +105,7 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
                 result
             })
     } else {
-        args.path.clone()
+        worktree_path.clone()
     };
 
     // Git worktreeを作成
@@ -105,27 +120,19 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         return Ok(());
     }
 
-    // ブランチ名を決定（指定されている場合はそれを使用、なければパスから推測）
+    // ブランチ名を決定
     let branch_name = args
         .new_branch
         .as_ref()
         .or(args.force_branch.as_ref())
-        .or(args.branch.as_ref())
         .cloned()
-        .unwrap_or_else(|| {
-            // ブランチ名が指定されていない場合は、パスの最後の部分を使用
-            args.path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("worktree")
-                .to_string()
-        });
+        .unwrap_or_else(|| args.branch.clone());
 
     // フック実行の準備
     let hook_executor = HookExecutor::new();
     let hook_context = HookContext::new(
         branch_name.clone(), // agent_nameの代わりにブランチ名を使用
-        worktree_path.clone(),
+        worktree_path_absolute.clone(),
         branch_name.clone(),
         git.get_repo_path().to_path_buf(),
     );
@@ -168,7 +175,7 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
             } else {
                 std::env::current_dir()?.join(repo_root).join(&mapping.path)
             };
-            let target = worktree_path.join(&mapping.path);
+            let target = worktree_path_absolute.join(&mapping.path);
 
             // ソースファイルが存在しない場合はスキップ
             if !source.exists() {
@@ -239,9 +246,9 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
 
     // パス表示やcdコマンド表示の処理
     if args.print_path {
-        println!("{}", worktree_path.display());
+        println!("{}", worktree_path_absolute.display());
     } else if args.cd_command {
-        println!("cd \"{}\"", worktree_path.display());
+        println!("cd \"{}\"", worktree_path_absolute.display());
     } else if !args.quiet {
         // git worktreeの出力をそのまま表示
         print!("{}", String::from_utf8_lossy(&output.stdout));
@@ -496,6 +503,29 @@ pub async fn handle_config(args: ConfigArgs) -> TwinResult<()> {
         println!("  twin config --set key=value : 設定値をセット");
         println!("  twin config --get key       : 設定値を取得");
     }
+
+    Ok(())
+}
+
+/// initコマンドのハンドラー
+pub async fn handle_init(args: InitArgs) -> TwinResult<()> {
+    // TODO(human): Add interactive mode support here
+    // When args.interactive is true, prompt user for:
+    // - worktree_base (default: "./worktrees")
+    // - branch_prefix (default: "agent/")
+    // Then pass these values to Config::init_with_options() or similar
+
+    // config::Config::init()を呼び出して設定ファイルを作成
+    let config_path = crate::config::Config::init(args.path, args.force).await?;
+
+    println!("✅ 設定ファイルを作成しました: {}", config_path.display());
+    println!();
+    println!("設定ファイルを編集して、プロジェクトに合わせてカスタマイズできます。");
+    println!("主な設定項目:");
+    println!("  - worktree_base: ワークツリーのベースディレクトリ");
+    println!("  - branch_prefix: ブランチ名のプレフィックス");
+    println!("  - files: シンボリックリンク/コピーするファイルマッピング");
+    println!("  - hooks: 各種フック（add, remove時の処理）");
 
     Ok(())
 }

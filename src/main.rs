@@ -61,6 +61,9 @@ async fn main() -> Result<()> {
         Commands::Tui => {
             todo!("Implement TUI")
         }
+        Commands::Init(args) => {
+            handle_init(args).await?;
+        }
     }
 
     Ok(())

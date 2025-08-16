@@ -135,7 +135,7 @@ impl Default for ConfigSettings {
         Self {
             files: Vec::new(),
             hooks: HookConfig::default(),
-            worktree_base: None,
+            worktree_base: Some(PathBuf::from("worktrees")),
             branch_prefix: Some("agent".to_string()),
         }
     }
@@ -349,7 +349,7 @@ mod tests {
         let settings = ConfigSettings::default();
         assert_eq!(settings.files.len(), 0);
         assert_eq!(settings.branch_prefix, Some("agent".to_string()));
-        assert!(settings.worktree_base.is_none());
+        assert_eq!(settings.worktree_base, Some(PathBuf::from("worktrees")));
 
         // HookConfigもデフォルトで空
         assert_eq!(settings.hooks.pre_create.len(), 0);

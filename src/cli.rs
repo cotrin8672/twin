@@ -20,7 +20,7 @@ pub struct Cli {
 /// 利用可能なサブコマンドの定義
 #[derive(Subcommand)]
 pub enum Commands {
-    /// ワークツリーを追加（git worktree add）
+    /// ワークツリーを追加（簡易版: twin add <ブランチ名> [パス]）
     Add(AddArgs),
 
     /// ワークツリーを追加（addのエイリアス、後方互換性のため）
@@ -39,16 +39,19 @@ pub enum Commands {
 
     /// TUIインターフェースを起動
     Tui,
+
+    /// 設定ファイルを初期化
+    Init(InitArgs),
 }
 
-/// addコマンドの引数（git worktree addと互換）
+/// addコマンドの引数（twin独自の使いやすい順序）
 #[derive(Parser)]
 pub struct AddArgs {
-    /// ワークツリーのパス
-    pub path: PathBuf,
+    /// ブランチ名またはコミット
+    pub branch: String,
 
-    /// ブランチ名またはコミット（省略時はパスから推測）
-    pub branch: Option<String>,
+    /// ワークツリーのパス（省略時は設定のworktree_base/ブランチ名）
+    pub path: Option<PathBuf>,
 
     /// 新しいブランチを作成
     #[arg(short = 'b', long)]
@@ -155,4 +158,16 @@ pub struct ConfigArgs {
     /// 設定値を取得
     #[arg(long)]
     pub get: Option<String>,
+}
+
+/// initコマンドの引数
+#[derive(Parser)]
+pub struct InitArgs {
+    /// 設定ファイルのパス（デフォルト: twin.toml）
+    #[arg(short, long)]
+    pub path: Option<PathBuf>,
+
+    /// 既存のファイルを上書き
+    #[arg(short, long)]
+    pub force: bool,
 }
