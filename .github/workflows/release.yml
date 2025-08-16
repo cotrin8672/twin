@@ -1,0 +1,184 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # v1.0.0 などのタグでトリガー
+
+permissions:
+  contents: write  # リリース作成に必要
+
+jobs:
+  # リリースの作成
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Get version from tag
+      id: get_version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Twin ${{ steps.get_version.outputs.version }}
+        body: |
+          Twin ${{ steps.get_version.outputs.version }}
+          
+          ## Installation
+          
+          ### Scoop (Windows)
+          ```powershell
+          scoop bucket add twin https://github.com/${{ github.repository_owner }}/scoop-twin
+          scoop install twin
+          ```
+          
+          ### Manual Installation
+          Download the appropriate binary for your platform and add it to your PATH.
+          
+          ## Changelog
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+        draft: false
+        prerelease: false
+
+  # 各プラットフォーム向けビルド
+  build-release:
+    name: Build for ${{ matrix.os }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: twin
+            asset_name: twin-linux-x64.tar.gz
+            asset_content_type: application/gzip
+          
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: twin.exe
+            asset_name: twin-windows-x64.zip
+            asset_content_type: application/zip
+          
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: twin
+            asset_name: twin-macos-x64.tar.gz
+            asset_content_type: application/gzip
+          
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: twin
+            asset_name: twin-macos-arm64.tar.gz
+            asset_content_type: application/gzip
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        target: ${{ matrix.target }}
+    
+    - name: Build Release Binary
+      run: cargo build --release --target ${{ matrix.target }}
+    
+    # Windows用のパッケージング
+    - name: Package (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        $version = "${{ needs.create-release.outputs.version }}"
+        $dist = "twin-$version-${{ matrix.target }}"
+        
+        New-Item -ItemType Directory -Force -Path $dist
+        Copy-Item "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" -Destination "$dist/"
+        Copy-Item "README.md" -Destination "$dist/"
+        Copy-Item "LICENSE" -Destination "$dist/" -ErrorAction SilentlyContinue
+        
+        # サンプル設定ファイル
+        @"
+# Twin設定ファイルサンプル
+# このファイルを .twin.toml として保存してください
+
+[[files]]
+path = ".env.template"
+mapping_type = "copy"
+description = "環境変数設定"
+skip_if_exists = true
+
+[hooks]
+pre_create = []
+post_create = []
+"@ | Out-File -FilePath "$dist/.twin.toml.sample" -Encoding UTF8
+        
+        Compress-Archive -Path $dist -DestinationPath "${{ matrix.asset_name }}"
+    
+    # Unix系用のパッケージング
+    - name: Package (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        version="${{ needs.create-release.outputs.version }}"
+        dist="twin-$version-${{ matrix.target }}"
+        
+        mkdir -p "$dist"
+        cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "$dist/"
+        cp README.md "$dist/"
+        [ -f LICENSE ] && cp LICENSE "$dist/"
+        
+        # サンプル設定ファイル
+        cat > "$dist/.twin.toml.sample" << 'EOF'
+# Twin設定ファイルサンプル
+# このファイルを .twin.toml として保存してください
+
+[[files]]
+path = ".env.template"
+mapping_type = "copy"
+description = "環境変数設定"
+skip_if_exists = true
+
+[hooks]
+pre_create = []
+post_create = []
+EOF
+        
+        tar czf "${{ matrix.asset_name }}" "$dist"
+    
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./${{ matrix.asset_name }}
+        asset_name: ${{ matrix.asset_name }}
+        asset_content_type: ${{ matrix.asset_content_type }}
+
+  # Scoopマニフェストの更新
+  update-scoop:
+    name: Update Scoop Manifest
+    needs: [create-release, build-release]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Update Scoop Bucket
+      run: |
+        echo "Scoop manifest update would happen here"
+        echo "This would typically:"
+        echo "1. Clone your scoop bucket repo"
+        echo "2. Update the twin.json manifest with new version and SHA256"
+        echo "3. Commit and push the changes"
+        echo ""
+        echo "For now, you'll need to update manually or set up a separate workflow"
