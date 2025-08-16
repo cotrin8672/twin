@@ -49,8 +49,8 @@ async fn test_hooks_execution_on_add() {
     // worktree作成
     let worktree_path = test_repo.path().join("wt-hooks");
     let args = AddArgs {
-        path: worktree_path.clone(),
-        branch: None,
+        branch: format!("test-hooks-{test_id}"),
+        path: Some(worktree_path.clone()),
         new_branch: Some(format!("test-hooks-{test_id}")),
         force_branch: None,
         detach: false,
@@ -101,8 +101,8 @@ async fn test_hooks_execution_on_remove() {
     // まずworktreeを作成
     let worktree_path = test_repo.path().join("wt-remove-hooks");
     let add_args = AddArgs {
-        path: worktree_path.clone(),
-        branch: None,
+        branch: format!("test-remove-{test_id}"),
+        path: Some(worktree_path.clone()),
         new_branch: Some(format!("test-remove-{test_id}")),
         force_branch: None,
         detach: false,
@@ -162,8 +162,8 @@ pre_create = [
 
     let worktree_path = test_repo.path().join("wt-error-continue");
     let args = AddArgs {
-        path: worktree_path.clone(),
-        branch: None,
+        branch: format!("test-error-{test_id}"),
+        path: Some(worktree_path.clone()),
         new_branch: Some(format!("test-error-{test_id}")),
         force_branch: None,
         detach: false,
@@ -203,8 +203,8 @@ pre_create = [
 
     let worktree_path = test_repo.path().join("wt-error-fail");
     let args = AddArgs {
-        path: worktree_path.clone(),
-        branch: None,
+        branch: format!("test-fail-{test_id}"),
+        path: Some(worktree_path.clone()),
         new_branch: Some(format!("test-fail-{test_id}")),
         force_branch: None,
         detach: false,

@@ -45,27 +45,30 @@ cargo install --path .
 
 ### 基本コマンド
 
-#### Worktreeの作成（git worktree add のラッパー）
+#### Worktreeの作成（簡易版）
 ```bash
-# 基本的な使用方法
-twin add <path> [<branch>]
+# 基本的な使用方法（ブランチ名のみ指定）
+# デフォルトで ./worktrees/feature-new に作成される
+twin add feature-new
+
+# パスを明示的に指定
+twin add feature-new ../custom-path
 
 # 新しいブランチを作成
-twin add ../feature-new -b feature-new
-
-# 既存のブランチをチェックアウト
-twin add ../hotfix hotfix-branch
+twin add feature-new -b feature-new
 
 # 設定ファイルを指定（副作用を適用）
-twin add ../feature --config .twin.toml
+twin add feature-new --config .twin.toml
 
 # Git worktree のみ実行（副作用をスキップ）
-twin add ../feature --git-only
+twin add feature-new --git-only
 
 # その他の git worktree オプションもサポート
-twin add ../feature --detach
-twin add ../feature --lock
+twin add feature-new --detach
+twin add feature-new --lock
 ```
+
+デフォルトでは、設定ファイルの `worktree_base` に指定されたディレクトリ（デフォルト: `./worktrees`）に、ブランチ名と同じ名前のディレクトリが作成されます。
 
 #### Worktreeの一覧表示（git worktree list のラッパー）
 ```bash
@@ -123,8 +126,8 @@ Twin は `.twin.toml` という設定ファイルを使用して副作用を定�
 ```toml
 # .twin.toml - Twin設定ファイルの例
 
-# Worktreeのベースディレクトリ（省略時: ../ブランチ名）
-# worktree_base = "../workspaces"
+# Worktreeのベースディレクトリ（省略時: ./worktrees）
+worktree_base = "./worktrees"
 
 # ファイルマッピング設定
 # Worktree作成時に自動的にシンボリックリンクやコピーを作成します
