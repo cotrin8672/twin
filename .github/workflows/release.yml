@@ -25,32 +25,40 @@ jobs:
       id: get_version
       run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
     
-    - name: Create Release
+    - name: Create Release with GitHub CLI
       id: create_release
-      uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Twin ${{ steps.get_version.outputs.version }}
-        body: |
-          Twin ${{ steps.get_version.outputs.version }}
-          
-          ## Installation
-          
-          ### Scoop (Windows)
-          ```powershell
-          scoop bucket add twin https://github.com/${{ github.repository_owner }}/scoop-twin
-          scoop install twin
-          ```
-          
-          ### Manual Installation
-          Download the appropriate binary for your platform and add it to your PATH.
-          
-          ## Changelog
-          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-        draft: false
-        prerelease: false
+      run: |
+        # Generate release notes
+        RELEASE_NOTES=$(gh api \
+          -X POST \
+          /repos/${{ github.repository }}/releases/generate-notes \
+          -f tag_name='${{ github.ref_name }}' \
+          -f target_commitish='${{ github.sha }}' \
+          --jq .body)
+        
+        # Create release
+        gh release create '${{ github.ref_name }}' \
+          --title "Twin ${{ steps.get_version.outputs.version }}" \
+          --notes "## Installation
+        
+        ### Scoop (Windows)
+        \`\`\`powershell
+        scoop bucket add twin https://github.com/${{ github.repository_owner }}/scoop-twin
+        scoop install twin
+        \`\`\`
+        
+        ### Manual Installation
+        Download the appropriate binary for your platform and add it to your PATH.
+        
+        ## What's Changed
+        $RELEASE_NOTES" \
+          --draft=false \
+          --prerelease=false
+        
+        # Get the upload URL for assets
+        echo "upload_url=$(gh release view '${{ github.ref_name }}' --json uploadUrl --jq .uploadUrl | sed 's/{?name,label}//')" >> $GITHUB_OUTPUT
 
   # 各プラットフォーム向けビルド
   build-release:
@@ -126,14 +134,12 @@ jobs:
         tar czf "${{ matrix.asset_name }}" "$dist"
     
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./${{ matrix.asset_name }}
-        asset_name: ${{ matrix.asset_name }}
-        asset_content_type: ${{ matrix.asset_content_type }}
+      run: |
+        gh release upload 'v${{ needs.create-release.outputs.version }}' \
+          './${{ matrix.asset_name }}' \
+          --clobber
 
   # crates.ioへの公開（Trusted Publishing使用）
   publish-crates:
