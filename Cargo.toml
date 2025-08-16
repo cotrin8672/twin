@@ -2,10 +2,10 @@
 name = "twin-cli"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["cotrin <cotrin8672@users.noreply.github.com>"]
 description = "Git worktree wrapper with side effects (symlinks and hooks)"
-repository = "https://github.com/yourusername/twin"
-homepage = "https://github.com/yourusername/twin"
+repository = "https://github.com/cotrin/twin"
+homepage = "https://github.com/cotrin/twin"
 documentation = "https://docs.rs/twin-cli"
 readme = "README.md"
 keywords = ["git", "worktree", "cli", "symlink", "hooks"]
@@ -21,21 +21,16 @@ path = "src/main.rs"
 anyhow = "1.0.99"
 chrono = { version = "0.4.41", features = ["serde"] }
 clap = { version = "4.5.44", features = ["derive", "env"] }
-crossterm = "0.29.0"
 directories = "6.0.0"
 git2 = "0.20.2"
 log = "0.4.27"
-notify = "8.2.0"
-ratatui = "0.29.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
 tempfile = "3.20.0"
 thiserror = "2.0.14"
 tokio = { version = "1.47.1", features = ["full"] }
 toml = "0.9.5"
-tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-which = "8.0.0"
 
 [dev-dependencies]
 cargo-husky = "1.5.0"
@@ -47,4 +42,3 @@ bollard = "0.18.1"
 futures-util = "0.3"
 uuid = { version = "1.11", features = ["v4"] }
 tar = "0.4"
-paste = "1.0"
