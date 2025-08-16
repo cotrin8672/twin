@@ -1,5 +1,7 @@
 # Twin - Git Worktree Manager
 
+**English** | [[日本語|JA-Home]]
+
 **A Git worktree wrapper that simplifies worktree operations and manages their side effects**
 
 ## Project Overview
