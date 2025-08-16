@@ -8,8 +8,21 @@ fn get_twin_binary() -> PathBuf {
     // OSに応じて適切なバイナリ名を選択
     let binary_name = if cfg!(windows) { "twin.exe" } else { "twin" };
 
-    let path = PathBuf::from(format!("target/debug/{binary_name}"));
+    // テスト実行ファイルから相対的にバイナリを探す
+    let current_exe = std::env::current_exe().expect("Failed to get current exe path");
+
+    // target/debug/deps/test-xxx から target/debug/twin へ
+    let path = current_exe
+        .parent() // deps
+        .and_then(|p| p.parent()) // debug
+        .map(|p| p.join(binary_name))
+        .expect("Failed to construct twin binary path");
+
     if !path.exists() {
+        // デバッグ情報を出力
+        eprintln!("Current exe: {current_exe:?}");
+        eprintln!("Looking for twin binary at: {path:?}");
+        eprintln!("Current dir: {:?}", std::env::current_dir().ok());
         panic!("twin binary not found. Run 'cargo build' first.");
     }
     path
