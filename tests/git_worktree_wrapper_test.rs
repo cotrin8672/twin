@@ -58,7 +58,7 @@ fn get_twin_binary() -> String {
 /// ユニークなワークツリーパスを生成（リポジトリ内に作成）
 fn unique_worktree_path(name: &str) -> String {
     let id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
-    format!("wt-{}-{}", name, id)
+    format!("wt-{name}-{id}")
 }
 
 // =============================================================================
@@ -81,13 +81,12 @@ fn test_add_command_basic() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    eprintln!("STDOUT: {}", stdout);
-    eprintln!("STDERR: {}", stderr);
+    eprintln!("STDOUT: {stdout}");
+    eprintln!("STDERR: {stderr}");
 
     assert!(
         output.status.success(),
-        "twin add should succeed. stderr: {}",
-        stderr
+        "twin add should succeed. stderr: {stderr}"
     );
 
     // worktreeが作成されたことを確認

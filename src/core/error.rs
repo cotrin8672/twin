@@ -267,7 +267,7 @@ mod tests {
         }
 
         // Display実装のテスト
-        let display_str = format!("{}", error);
+        let display_str = format!("{error}");
         assert!(display_str.contains("Git error"));
         assert!(display_str.contains("Failed to checkout branch"));
     }
@@ -314,7 +314,7 @@ mod tests {
         }
 
         // Display実装のテスト
-        let display_str = format!("{}", error);
+        let display_str = format!("{error}");
         assert!(display_str.contains("Config error"));
         assert!(display_str.contains("Invalid TOML"));
     }
@@ -366,7 +366,7 @@ mod tests {
         ];
 
         for (error, expected) in errors {
-            let display_str = format!("{}", error);
+            let display_str = format!("{error}");
             assert_eq!(display_str, expected);
         }
     }

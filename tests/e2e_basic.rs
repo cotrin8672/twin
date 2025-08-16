@@ -86,8 +86,8 @@ fn test_create_environment() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    println!("STDOUT: {}", stdout);
-    println!("STDERR: {}", stderr);
+    println!("STDOUT: {stdout}");
+    println!("STDERR: {stderr}");
 
     // 成功メッセージまたはWorktreeパスが出力されることを確認
     assert!(
@@ -103,7 +103,7 @@ fn test_create_environment() {
         .unwrap();
 
     let worktree_list = String::from_utf8_lossy(&worktree_output.stdout);
-    println!("Worktrees: {}", worktree_list);
+    println!("Worktrees: {worktree_list}");
 
     // test-envまたはagent/test-envブランチが存在することを確認
     assert!(
@@ -134,7 +134,7 @@ fn test_list_environments() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    println!("List output: {}", stdout);
+    println!("List output: {stdout}");
 
     // 何らかの出力があることを確認（空でもOK - レジストリが未実装の可能性）
 }
@@ -161,8 +161,8 @@ fn test_remove_environment() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    println!("Remove STDOUT: {}", stdout);
-    println!("Remove STDERR: {}", stderr);
+    println!("Remove STDOUT: {stdout}");
+    println!("Remove STDERR: {stderr}");
 
     // 削除メッセージまたは成功を確認
     assert!(
@@ -205,8 +205,8 @@ description = "Configuration file"
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    println!("Config create STDOUT: {}", stdout);
-    println!("Config create STDERR: {}", stderr);
+    println!("Config create STDOUT: {stdout}");
+    println!("Config create STDERR: {stderr}");
 
     // 作成が成功することを確認
     assert!(
@@ -301,8 +301,8 @@ path = "dummy.txt"
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    println!("Hook test STDOUT: {}", stdout);
-    println!("Hook test STDERR: {}", stderr);
+    println!("Hook test STDOUT: {stdout}");
+    println!("Hook test STDERR: {stderr}");
 
     // フック実行または成功を確認
     assert!(
@@ -326,7 +326,7 @@ fn test_json_output_format() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    println!("JSON output: {}", stdout);
+    println!("JSON output: {stdout}");
 
     // 空の配列またはJSON形式であることを確認
     let trimmed = stdout.trim();
@@ -379,7 +379,7 @@ fn test_branch_naming() {
         .unwrap();
 
     let branches = String::from_utf8_lossy(&output.stdout);
-    println!("Branches: {}", branches);
+    println!("Branches: {branches}");
 
     // agent/branch-testまたはbranch-testブランチが存在
     assert!(
@@ -401,7 +401,7 @@ fn test_custom_branch_name() {
         .expect("Failed to create with custom branch");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    println!("Custom branch output: {}", stdout);
+    println!("Custom branch output: {stdout}");
 
     // ブランチを確認
     let branch_output = Command::new("git")

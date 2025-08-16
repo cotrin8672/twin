@@ -6,6 +6,7 @@ use tempfile::TempDir;
 /// テスト用の一時的なGitリポジトリ
 pub struct TestRepo {
     temp_dir: TempDir,
+    #[allow(dead_code)]
     pub test_id: String,
     /// 作成されたworktreeのパスを記録
     created_worktrees: std::sync::Mutex<Vec<PathBuf>>,
@@ -19,20 +20,20 @@ impl TestRepo {
 
         // Gitリポジトリを初期化
         Command::new("git")
-            .args(&["init"])
+            .args(["init"])
             .current_dir(temp_dir.path())
             .output()
             .expect("Failed to init git repo");
 
         // Git設定（ローカルリポジトリのみ）
         Command::new("git")
-            .args(&["config", "user.name", "Test User"])
+            .args(["config", "user.name", "Test User"])
             .current_dir(temp_dir.path())
             .output()
             .expect("Failed to set git user name");
 
         Command::new("git")
-            .args(&["config", "user.email", "test@example.com"])
+            .args(["config", "user.email", "test@example.com"])
             .current_dir(temp_dir.path())
             .output()
             .expect("Failed to set git user email");
@@ -40,13 +41,13 @@ impl TestRepo {
         // 初期コミット
         std::fs::write(temp_dir.path().join("README.md"), "# Test Repo").unwrap();
         Command::new("git")
-            .args(&["add", "."])
+            .args(["add", "."])
             .current_dir(temp_dir.path())
             .output()
             .expect("Failed to add files");
 
         Command::new("git")
-            .args(&["commit", "-m", "Initial commit"])
+            .args(["commit", "-m", "Initial commit"])
             .current_dir(temp_dir.path())
             .output()
             .expect("Failed to commit");
@@ -59,6 +60,7 @@ impl TestRepo {
     }
 
     /// コマンドを実行
+    #[allow(dead_code)]
     pub fn exec(&self, cmd: &[&str]) -> std::process::Output {
         Command::new(cmd[0])
             .args(&cmd[1..])
@@ -68,6 +70,7 @@ impl TestRepo {
     }
 
     /// twinコマンドを実行
+    #[allow(dead_code)]
     pub fn run_twin(&self, args: &[&str]) -> std::process::Output {
         let twin_binary = Self::get_twin_binary();
         Command::new(twin_binary)
@@ -78,6 +81,7 @@ impl TestRepo {
     }
 
     /// 一意のworktreeパスを生成
+    #[allow(dead_code)]
     pub fn worktree_path(&self, name: &str) -> String {
         let path_str = format!("../test-{}-{}", name, self.test_id);
         // worktreeの絶対パスを記録
@@ -104,6 +108,7 @@ impl TestRepo {
     }
 
     /// twinバイナリのパスを取得
+    #[allow(dead_code)]
     fn get_twin_binary() -> PathBuf {
         let exe_path = std::env::current_exe().unwrap();
         let target_dir = exe_path.parent().unwrap().parent().unwrap();
@@ -120,7 +125,7 @@ impl Drop for TestRepo {
             if worktree_path.exists() {
                 // git worktree removeを試みる
                 Command::new("git")
-                    .args(&[
+                    .args([
                         "worktree",
                         "remove",
                         "--force",

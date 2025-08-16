@@ -36,12 +36,11 @@ branch_prefix = "test/"
     for (path, mapping_type) in files {
         config_content.push_str(&format!(
             r#"[[files]]
-path = "{}"
-mapping_type = "{}"
+path = "{path}"
+mapping_type = "{mapping_type}"
 skip_if_exists = false
 
-"#,
-            path, mapping_type
+"#
         ));
     }
 
@@ -96,7 +95,7 @@ fn test_symlink_creation_with_permission() {
         }
         Err(e) => {
             // 権限がない場合のエラーは許容
-            eprintln!("Symlink creation failed (expected on CI): {}", e);
+            eprintln!("Symlink creation failed (expected on CI): {e}");
         }
     }
 }
@@ -203,7 +202,7 @@ fn test_multiple_file_mappings() {
     // それぞれのファイルにリンク/コピーを作成
     for (path, _) in &files {
         let source = temp.path().join(path);
-        let target = temp.path().join(format!("link_{}", path));
+        let target = temp.path().join(format!("link_{path}"));
 
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).unwrap();

@@ -1,6 +1,6 @@
 //! フック機能の統合テスト
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 use twin_cli::cli::commands::{handle_add, handle_remove};
 use twin_cli::cli::{AddArgs, RemoveArgs};
 
@@ -8,29 +8,27 @@ mod common;
 use common::TestRepo;
 
 /// フック実行を記録するためのファイルを作成
-fn create_hook_config(_test_dir: &PathBuf) -> String {
-    format!(
-        r#"
+fn create_hook_config(_test_dir: &Path) -> String {
+    r#"
 [[files]]
 path = ".env"
 mapping_type = "symlink"
 
 [hooks]
 pre_create = [
-    {{ command = "echo", args = ["pre_create: {{{{branch}}}}"] }},
-    {{ command = "echo", args = ["pre_create_to_file"], continue_on_error = true }}
+    { command = "echo", args = ["pre_create: {{branch}}"] },
+    { command = "echo", args = ["pre_create_to_file"], continue_on_error = true }
 ]
 post_create = [
-    {{ command = "echo", args = ["post_create: {{{{branch}}}}"] }}
+    { command = "echo", args = ["post_create: {{branch}}"] }
 ]
 pre_remove = [
-    {{ command = "echo", args = ["pre_remove: {{{{branch}}}}"] }}
+    { command = "echo", args = ["pre_remove: {{branch}}"] }
 ]
 post_remove = [
-    {{ command = "echo", args = ["post_remove: {{{{branch}}}}"] }}
+    { command = "echo", args = ["post_remove: {{branch}}"] }
 ]
-"#
-    )
+"#.to_string()
 }
 
 #[tokio::test]
@@ -40,7 +38,7 @@ async fn test_hooks_execution_on_add() {
     let config_path = test_repo.path().join(".twin.toml");
 
     // フック設定を作成
-    let config = create_hook_config(&test_repo.path().to_path_buf());
+    let config = create_hook_config(test_repo.path());
     fs::write(&config_path, config).unwrap();
 
     // .envファイルを作成（シンボリックリンク用）
@@ -52,7 +50,7 @@ async fn test_hooks_execution_on_add() {
     let args = AddArgs {
         path: worktree_path.clone(),
         branch: None,
-        new_branch: Some(format!("test-hooks-{}", test_id)),
+        new_branch: Some(format!("test-hooks-{test_id}")),
         force_branch: None,
         detach: false,
         config: Some(config_path.clone()),
@@ -92,7 +90,7 @@ async fn test_hooks_execution_on_remove() {
     let config_path = test_repo.path().join(".twin.toml");
 
     // フック設定を作成
-    let config = create_hook_config(&test_repo.path().to_path_buf());
+    let config = create_hook_config(test_repo.path());
     fs::write(&config_path, config).unwrap();
 
     // .envファイルを作成
@@ -104,7 +102,7 @@ async fn test_hooks_execution_on_remove() {
     let add_args = AddArgs {
         path: worktree_path.clone(),
         branch: None,
-        new_branch: Some(format!("test-remove-{}", test_id)),
+        new_branch: Some(format!("test-remove-{test_id}")),
         force_branch: None,
         detach: false,
         config: Some(config_path.clone()),
@@ -165,7 +163,7 @@ pre_create = [
     let args = AddArgs {
         path: worktree_path.clone(),
         branch: None,
-        new_branch: Some(format!("test-error-{}", test_id)),
+        new_branch: Some(format!("test-error-{test_id}")),
         force_branch: None,
         detach: false,
         config: Some(config_path),
@@ -206,7 +204,7 @@ pre_create = [
     let args = AddArgs {
         path: worktree_path.clone(),
         branch: None,
-        new_branch: Some(format!("test-fail-{}", test_id)),
+        new_branch: Some(format!("test-fail-{test_id}")),
         force_branch: None,
         detach: false,
         config: Some(config_path),

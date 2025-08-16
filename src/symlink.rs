@@ -61,6 +61,13 @@ impl UnixSymlinkManager {
 }
 
 #[cfg(unix)]
+impl Default for UnixSymlinkManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(unix)]
 impl SymlinkManager for UnixSymlinkManager {
     fn create_symlink(&self, source: &Path, target: &Path) -> TwinResult<SymlinkInfo> {
         // 透明性のあるコマンド実行ログ
