@@ -140,11 +140,14 @@ jobs:
           './${{ matrix.asset_name }}' \
           --clobber
 
-  # crates.ioへの公開（Trusted Publishing使用）
+  # crates.ioへの公開（2回目以降、Trusted Publishing使用）
+  # 初回は手動で: cargo login && cargo publish
   publish-crates:
     name: Publish to crates.io
     needs: create-release
     runs-on: ubuntu-latest
+    # v0.2.0以降で有効化（初回v0.1.0は手動公開のため）
+    if: ${{ !startsWith(github.ref, 'refs/tags/v0.1.') }}
     
     steps:
     - uses: actions/checkout@v4
@@ -158,9 +161,10 @@ jobs:
         cargo package --list
     
     - name: Publish to crates.io
-      # Trusted Publishingを使用（要事前設定）
-      # 1. crates.ioにログイン
-      # 2. Account Settings → Trusted Publishers
+      # Trusted Publishingを使用（初回公開後に設定）
+      # 設定手順:
+      # 1. 初回は手動で cargo publish
+      # 2. crates.io → Settings → Trusted Publishers
       # 3. このリポジトリを追加
       run: |
         cargo publish --no-verify
