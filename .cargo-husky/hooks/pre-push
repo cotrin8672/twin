@@ -35,18 +35,31 @@ fi
 echo "✅ Release build successful"
 echo ""
 
-# 4. 全テスト実行
-echo "🧪 Running all tests..."
-if ! cargo test --all-targets --all-features; then
-    echo ""
-    echo "❌ Some tests failed!"
-    exit 1
+# 4. 全テスト実行 (nextest)
+echo "🧪 Running all tests with nextest..."
+if command -v cargo-nextest >/dev/null 2>&1; then
+    # nextestで全テスト実行
+    if ! cargo nextest run --all-targets --all-features; then
+        echo ""
+        echo "❌ Some tests failed!"
+        exit 1
+    fi
+    echo "✅ All tests passed (nextest)"
+else
+    # nextestがない場合は通常のテストを実行
+    echo "⚠️  cargo-nextest not found, using standard test runner"
+    if ! cargo test --all-targets --all-features; then
+        echo ""
+        echo "❌ Some tests failed!"
+        exit 1
+    fi
+    echo "✅ All tests passed (standard runner)"
 fi
-echo "✅ All tests passed"
 echo ""
 
 # 5. ドキュメントテスト
 echo "📚 Running documentation tests..."
+# ドキュメントテストは標準のcargo testで実行（nextestは未対応）
 if ! cargo test --doc; then
     echo ""
     echo "❌ Documentation tests failed!"
