@@ -148,10 +148,6 @@ impl SymlinkManager for UnixSymlinkManager {
         }
     }
 
-    fn select_strategy(&self, _source: &Path, _target: &Path) -> LinkStrategy {
-        LinkStrategy::Symlink // Unixでは常にシンボリックリンク
-    }
-
     #[allow(dead_code)]
     fn get_manual_instructions(&self, source: &Path, target: &Path) -> String {
         format!(

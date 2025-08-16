@@ -15,9 +15,9 @@ fi
 echo "✅ Format check passed"
 echo ""
 
-# 2. Clippy (Linter)
+# 2. Clippy (Linter) - warningsをエラーとして扱う
 echo "🔍 Running clippy linter..."
-if ! cargo clippy --all-targets --all-features; then
+if ! cargo clippy --all-targets --all-features -- -D warnings; then
     echo ""
     echo "❌ Clippy found issues!"
     echo "💡 Fix the warnings above before committing"
@@ -36,14 +36,26 @@ fi
 echo "✅ Build check passed"
 echo ""
 
-# 4. 高速テスト実行（単体テストのみ）
-echo "🧪 Running unit tests..."
-if ! cargo test --lib --bins; then
-    echo ""
-    echo "❌ Some tests failed!"
-    exit 1
+# 4. テスト実行 (nextest)
+echo "🧪 Running tests with nextest..."
+if command -v cargo-nextest >/dev/null 2>&1; then
+    # nextestがインストール済みの場合
+    if ! cargo nextest run; then
+        echo ""
+        echo "❌ Some tests failed!"
+        exit 1
+    fi
+else
+    # nextestがない場合は通常のテストを実行
+    echo "⚠️  cargo-nextest not found, falling back to standard test runner"
+    echo "💡 Install nextest with: cargo install cargo-nextest --locked"
+    if ! cargo test; then
+        echo ""
+        echo "❌ Some tests failed!"
+        exit 1
+    fi
 fi
-echo "✅ Unit tests passed"
+echo "✅ Tests passed"
 echo ""
 
 echo "✨ All pre-commit checks passed successfully!"
