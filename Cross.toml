@@ -1,9 +1,20 @@
 # Cross configuration for cross-compilation
 # https://github.com/cross-rs/cross
 
-# Linux musl targets
+# Build configuration
+[build]
+# Use vendored dependencies to avoid system library issues
+default-target = "x86_64-unknown-linux-gnu"
+
+# Pre-build script to ensure vendored dependencies are used
+[build.env]
+passthrough = [
+    "CARGO_NET_GIT_FETCH_WITH_CLI",
+    "RUSTFLAGS",
+]
+
+# Linux musl targets - static linking
 [target.x86_64-unknown-linux-musl]
-# Use the latest cross image with pre-installed dependencies
 image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:latest"
 
 [target.aarch64-unknown-linux-musl]
@@ -13,7 +24,9 @@ image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:latest"
 [target.aarch64-unknown-linux-gnu]
 image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:latest"
 
-# Environment variables for all targets
-[target.env]
-# Use vendored libraries to avoid system dependencies
-CARGO_NET_GIT_FETCH_WITH_CLI = "true"
+# macOS targets don't need cross (native compilation)
+[target.x86_64-apple-darwin]
+runner = "cargo"
+
+[target.aarch64-apple-darwin]
+runner = "cargo"

@@ -22,7 +22,7 @@ anyhow = "1.0.99"
 chrono = { version = "0.4.41", features = ["serde"] }
 clap = { version = "4.5.44", features = ["derive", "env"] }
 directories = "6.0.0"
-git2 = { version = "0.20.2", features = ["vendored-libgit2"] }
+git2 = { version = "0.20.2", features = ["vendored-libgit2", "vendored-openssl"] }
 log = "0.4.27"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
