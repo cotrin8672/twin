@@ -1,0 +1,218 @@
+name: Update GitHub Wiki
+
+on:
+  # Trigger on push to main branch when docs are changed
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'docs/**'
+      - '.github/workflows/update-wiki.yml'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      commit_message:
+        description: 'Custom commit message for Wiki update'
+        required: false
+        default: 'Manual Wiki update'
+      force_update:
+        description: 'Force update even if no changes detected'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write  # Need write for wiki repository
+
+jobs:
+  update-wiki:
+    runs-on: ubuntu-latest
+    name: Update GitHub Wiki Documentation
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for commit info
+      
+      - name: Setup Git Configuration
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Clone Wiki Repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Cloning wiki repository..."
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git wiki-temp || {
+            echo "Wiki doesn't exist yet, creating new one..."
+            mkdir wiki-temp
+            cd wiki-temp
+            git init
+            git remote add origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git
+            cd ..
+          }
+      
+      - name: Sync Documentation to Wiki
+        run: |
+          # Clear existing wiki content (except .git)
+          find wiki-temp -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          
+          # Copy documentation files
+          cp -r docs/* wiki-temp/
+          
+          # Remove README.md (Wiki uses Home.md)
+          rm -f wiki-temp/README.md
+          
+          # Create sidebar navigation
+          cat > wiki-temp/_Sidebar.md << 'EOF'
+          # Navigation
+          
+          ## 🏠 Home
+          * [[Home]]
+          * [[日本語|JA-Home]]
+          
+          ## 🚀 Getting Started
+          * [[Development Setup|Getting-Started-Development-Setup]]
+          * [[Quick Start|Getting-Started-Quick-Start]]
+          * [[Architecture Overview|Getting-Started-Architecture-Overview]]
+          * [[Core Concepts|Getting-Started-Core-Concepts]]
+          
+          ## 🏗️ Architecture
+          * [[Technology Stack|Architecture-Technology-Stack]]
+          * [[System Design|Architecture-System-Design]]
+          * [[Module Structure|Architecture-Module-Structure]]
+          * [[Data Flow|Architecture-Data-Flow]]
+          
+          ## 🧪 Testing
+          * [[Testing Strategy|Testing-Testing-Strategy]]
+          * [[Unit Testing|Testing-Unit-Testing]]
+          * [[Integration Testing|Testing-Integration-Testing]]
+          * [[E2E Testing|Testing-E2E-Testing]]
+          
+          ## 💻 Development
+          * [[Local Development|Development-Guides-Local-Development]]
+          * [[Debugging|Development-Guides-Debugging]]
+          * [[Code Styles|Development-Guides-Code-Styles]]
+          
+          ## 📦 Deployment
+          * [[Build Process|Deployment-Build-Process]]
+          * [[Configuration|Deployment-Configuration]]
+          
+          ---
+          
+          ## 🌍 日本語版
+          
+          ### はじめに
+          * [[開発環境|JA-Getting-Started-Development-Setup]]
+          * [[クイックスタート|JA-Getting-Started-Quick-Start]]
+          * [[アーキテクチャ|JA-Getting-Started-Architecture-Overview]]
+          * [[コア概念|JA-Getting-Started-Core-Concepts]]
+          EOF
+          
+          # Create footer
+          cat > wiki-temp/_Footer.md << 'EOF'
+          ---
+          Twin - Git Worktree Manager | [Repository](https://github.com/${{ github.repository }}) | [Issues](https://github.com/${{ github.repository }}/issues)
+          EOF
+      
+      - name: Check for Changes
+        id: check_changes
+        working-directory: wiki-temp
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in Wiki"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected, will update Wiki"
+          fi
+      
+      - name: Commit and Push Wiki Changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        working-directory: wiki-temp
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_MESSAGE: ${{ github.event.inputs.commit_message || 'Update Wiki documentation' }}
+        run: |
+          git add -A
+          
+          # Create detailed commit message
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_SHORT="${COMMIT_SHA:0:7}"
+          COMMIT_AUTHOR="${{ github.actor }}"
+          COMMIT_DATE="$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          
+          git commit -m "$COMMIT_MESSAGE" \
+            -m "Source commit: ${{ github.repository }}@${COMMIT_SHORT}" \
+            -m "Updated by: ${COMMIT_AUTHOR}" \
+            -m "Date: ${COMMIT_DATE}" \
+            -m "Workflow: ${{ github.workflow }} #${{ github.run_number }}"
+          
+          # Push to wiki
+          git push origin master 2>/dev/null || git push origin main
+      
+      - name: Create Summary
+        if: always()
+        run: |
+          echo "## 📚 Wiki Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ]; then
+            echo "✅ **Wiki successfully updated!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Author**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Message**: ${{ github.event.inputs.commit_message || 'Update Wiki documentation' }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **No changes detected**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Wiki is already up to date with the documentation." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View Wiki](https://github.com/${{ github.repository }}/wiki)" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Validate Wiki links
+  validate-wiki:
+    runs-on: ubuntu-latest
+    needs: update-wiki
+    name: Validate Wiki Links
+    
+    steps:
+      - name: Checkout Wiki
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git wiki-validate
+      
+      - name: Validate Internal Links
+        working-directory: wiki-validate
+        run: |
+          echo "Validating Wiki internal links..."
+          
+          # Find all markdown files
+          find . -name "*.md" -type f | while read -r file; do
+            echo "Checking: $file"
+            
+            # Extract wiki links [[...]]
+            grep -oE '\[\[([^]]+)\]\]' "$file" | while read -r link; do
+              # Extract link target
+              target=$(echo "$link" | sed 's/\[\[\([^|]*\).*/\1/')
+              target_file="${target}.md"
+              
+              # Check if target exists
+              if [ ! -f "$target_file" ]; then
+                echo "  ⚠️ Broken link: $link -> $target_file"
+              fi
+            done
+          done
+      
+      - name: Report Validation Results
+        if: always()
+        run: |
+          echo "## 🔍 Wiki Link Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Wiki internal links have been validated." >> $GITHUB_STEP_SUMMARY
