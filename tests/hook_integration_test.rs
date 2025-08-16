@@ -28,7 +28,8 @@ pre_remove = [
 post_remove = [
     { command = "echo", args = ["post_remove: {{branch}}"] }
 ]
-"#.to_string()
+"#
+    .to_string()
 }
 
 #[tokio::test]

@@ -11,15 +11,6 @@ use std::path::Path;
 #[cfg(windows)]
 use std::process::Command;
 
-/// リンク作成の戦略
-#[derive(Debug, Clone, Copy)]
-pub enum LinkStrategy {
-    /// シンボリックリンク（推奨）
-    Symlink,
-    /// ファイルコピー（フォールバック）
-    Copy,
-}
-
 /// プラットフォーム共通のトレイト
 pub trait SymlinkManager {
     /// シンボリックリンクを作成
@@ -31,9 +22,6 @@ pub trait SymlinkManager {
     /// シンボリックリンクを検証
     #[allow(dead_code)]
     fn validate_symlink(&self, path: &Path) -> TwinResult<bool>;
-
-    /// 最適なリンク戦略を選択
-    fn select_strategy(&self, source: &Path, target: &Path) -> LinkStrategy;
 
     /// 手動作成方法の説明を取得
     #[allow(dead_code)]
@@ -271,41 +259,35 @@ impl SymlinkManager for WindowsSymlinkManager {
             fs::create_dir_all(parent)?;
         }
 
-        let strategy = self.select_strategy(source, target);
-
-        let result = match strategy {
-            LinkStrategy::Symlink => {
-                // 開発者モードが無効な場合、エラーメッセージを表示
-                if !self.developer_mode && !self.is_elevated {
-                    eprintln!(
-                        "⚠️  Warning: Symbolic link creation requires Developer Mode or Administrator privileges"
-                    );
-                    eprintln!("⚠️  Falling back to file copy instead");
-                    self.copy_file(source, target)
+        // 開発者モードまたは管理者権限があればシンボリックリンクを作成
+        let result = if self.developer_mode || self.is_elevated {
+            // 標準ライブラリのAPI を使用
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::{symlink_dir, symlink_file};
+                if source.is_dir() {
+                    symlink_dir(source, target).map_err(|e| {
+                        TwinError::symlink(
+                            format!("Failed to create directory symlink: {e}"),
+                            Some(target.to_path_buf()),
+                        )
+                    })
                 } else {
-                    // 標準ライブラリのAPI を使用
-                    #[cfg(windows)]
-                    {
-                        use std::os::windows::fs::{symlink_dir, symlink_file};
-                        if source.is_dir() {
-                            symlink_dir(source, target).map_err(|e| {
-                                TwinError::symlink(
-                                    format!("Failed to create directory symlink: {e}"),
-                                    Some(target.to_path_buf()),
-                                )
-                            })
-                        } else {
-                            symlink_file(source, target).map_err(|e| {
-                                TwinError::symlink(
-                                    format!("Failed to create file symlink: {e}"),
-                                    Some(target.to_path_buf()),
-                                )
-                            })
-                        }
-                    }
+                    symlink_file(source, target).map_err(|e| {
+                        TwinError::symlink(
+                            format!("Failed to create file symlink: {e}"),
+                            Some(target.to_path_buf()),
+                        )
+                    })
                 }
             }
-            LinkStrategy::Copy => self.copy_file(source, target),
+        } else {
+            // 開発者モードが無効な場合、エラーメッセージを表示してコピー
+            eprintln!(
+                "⚠️  Warning: Symbolic link creation requires Developer Mode or Administrator privileges"
+            );
+            eprintln!("⚠️  Falling back to file copy instead");
+            self.copy_file(source, target)
         };
 
         let mut info = SymlinkInfo::new(source.to_path_buf(), target.to_path_buf());
@@ -372,16 +354,6 @@ impl SymlinkManager for WindowsSymlinkManager {
         }
 
         Ok(false)
-    }
-
-    fn select_strategy(&self, _source: &Path, _target: &Path) -> LinkStrategy {
-        // 開発者モードまたは管理者権限があればシンボリックリンク
-        // なければ最初からコピー
-        if self.developer_mode || self.is_elevated {
-            LinkStrategy::Symlink
-        } else {
-            LinkStrategy::Copy
-        }
     }
 
     #[allow(dead_code)]

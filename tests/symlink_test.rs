@@ -63,24 +63,12 @@ fn test_symlink_manager_initialization() {
 
 #[test]
 fn test_symlink_creation_with_permission() {
-    use twin_cli::symlink::{create_symlink_manager, LinkStrategy};
+    use twin_cli::symlink::create_symlink_manager;
 
     let (_temp, source, target) = setup_test_workspace();
     let manager = create_symlink_manager();
 
-    // 戦略の選択をテスト
-    let strategy = manager.select_strategy(&source, &target);
-
-    // プラットフォームと権限に依存
-    match strategy {
-        LinkStrategy::Symlink => {
-            println!("Platform supports symlinks");
-        }
-        LinkStrategy::Copy => {
-            println!("Falling back to copy");
-        }
-    }
-
+    // プラットフォームと権限に応じて自動的にシンボリックリンクまたはコピーが選択される
     // シンボリックリンクまたはコピーを作成
     let result = manager.create_symlink(&source, &target);
 
