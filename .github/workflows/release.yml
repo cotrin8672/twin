@@ -43,10 +43,9 @@ jobs:
           --title "Twin ${{ steps.get_version.outputs.version }}" \
           --notes "## Installation
         
-        ### Scoop (Windows)
-        \`\`\`powershell
-        scoop bucket add twin https://github.com/${{ github.repository_owner }}/scoop-twin
-        scoop install twin
+        ### Cargo
+        \`\`\`bash
+        cargo install twin-cli
         \`\`\`
         
         ### Manual Installation
@@ -159,27 +158,10 @@ jobs:
         cargo package --list
     
     - name: Publish to crates.io
-      # Trusted Publishingを使用するため、API tokenは不要
-      # 事前にcrates.ioの設定でこのリポジトリを許可リストに追加する必要があります
+      # Trusted Publishingを使用（要事前設定）
+      # 1. crates.ioにログイン
+      # 2. Account Settings → Trusted Publishers
+      # 3. このリポジトリを追加
       run: |
         cargo publish --no-verify
-      env:
-        # Trusted Publishingが有効な場合、この環境変数は自動的に設定されます
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  # Scoopマニフェストの更新
-  update-scoop:
-    name: Update Scoop Manifest
-    needs: [create-release, build-release]
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Update Scoop Bucket
-      run: |
-        echo "Scoop manifest update would happen here"
-        echo "This would typically:"
-        echo "1. Clone your scoop bucket repo"
-        echo "2. Update the twin.json manifest with new version and SHA256"
-        echo "3. Commit and push the changes"
-        echo ""
-        echo "For now, you'll need to update manually or set up a separate workflow"
