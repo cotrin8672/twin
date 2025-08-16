@@ -1,150 +1,180 @@
 name: Release
 
+# Releasesへのファイル追加のために書き込み権限が必要
+permissions:
+  contents: write
+  id-token: write  # Trusted Publishing用のOIDCトークン
+
 on:
   push:
     tags:
-      - 'v*'  # v1.0.0 などのタグでトリガー
-
-permissions:
-  contents: write  # リリース作成に必要
-  id-token: write  # Trusted Publishing用のOIDCトークン
+      - v*
 
 jobs:
-  # リリースの作成
+  # リリース作成
   create-release:
-    name: Create Release
+    name: Create GitHub Release
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
-    
     steps:
-    - uses: actions/checkout@v4
-    
     - name: Get version from tag
       id: get_version
-      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      run: |
+        echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
     
-    - name: Create Release with GitHub CLI
-      id: create_release
+    - name: Create Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Generate release notes
-        RELEASE_NOTES=$(gh api \
-          -X POST \
-          /repos/${{ github.repository }}/releases/generate-notes \
-          -f tag_name='${{ github.ref_name }}' \
-          -f target_commitish='${{ github.sha }}' \
-          --jq .body)
-        
-        # Create release
-        gh release create '${{ github.ref_name }}' \
-          --title "Twin ${{ steps.get_version.outputs.version }}" \
-          --notes "## Installation
-        
-        ### Cargo
-        \`\`\`bash
-        cargo install twin-cli
-        \`\`\`
-        
-        ### Manual Installation
-        Download the appropriate binary for your platform and add it to your PATH.
-        
-        ## What's Changed
-        $RELEASE_NOTES" \
-          --draft=false \
-          --prerelease=false
-        
-        # Get the upload URL for assets
-        echo "upload_url=$(gh release view '${{ github.ref_name }}' --json uploadUrl --jq .uploadUrl | sed 's/{?name,label}//')" >> $GITHUB_OUTPUT
+        # Check if release already exists
+        if gh release view '${{ github.ref_name }}' > /dev/null 2>&1; then
+          echo "Release ${{ github.ref_name }} already exists, skipping creation"
+        else
+          # Generate release notes
+          RELEASE_NOTES=$(gh api \
+            -X POST \
+            /repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name='${{ github.ref_name }}' \
+            -f target_commitish='${{ github.sha }}' \
+            --jq .body)
+          
+          # Create release
+          gh release create '${{ github.ref_name }}' \
+            --title "Twin ${{ steps.get_version.outputs.version }}" \
+            --notes "## Installation
+          
+          ### Cargo
+          \`\`\`bash
+          cargo install twin-cli
+          \`\`\`
+          
+          ### Manual Installation
+          Download the appropriate binary for your platform and add it to your PATH.
+          
+          ## What's Changed
+          $RELEASE_NOTES" \
+            --draft=false \
+            --prerelease=false
+        fi
 
   # 各プラットフォーム向けビルド
-  build-release:
-    name: Build for ${{ matrix.os }}
+  build:
+    name: Build for ${{ matrix.job.target }}
     needs: create-release
-    runs-on: ${{ matrix.os }}
-    
+    runs-on: ${{ matrix.job.os }}
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: twin
-            asset_name: twin-linux-x64.tar.gz
-            asset_content_type: application/gzip
+        job:
+          # Linux targets
+          - { os: ubuntu-latest  , target: x86_64-unknown-linux-gnu       , use-cross: false , extension: ""   }
+          - { os: ubuntu-latest  , target: x86_64-unknown-linux-musl      , use-cross: true  , extension: ""   }
+          - { os: ubuntu-latest  , target: aarch64-unknown-linux-gnu      , use-cross: true  , extension: ""   }
+          - { os: ubuntu-latest  , target: aarch64-unknown-linux-musl     , use-cross: true  , extension: ""   }
           
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: twin.exe
-            asset_name: twin-windows-x64.zip
-            asset_content_type: application/zip
+          # macOS targets
+          - { os: macos-latest   , target: x86_64-apple-darwin            , use-cross: false , extension: ""   }
+          - { os: macos-latest   , target: aarch64-apple-darwin           , use-cross: false , extension: ""   }
           
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact_name: twin
-            asset_name: twin-macos-x64.tar.gz
-            asset_content_type: application/gzip
-          
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact_name: twin
-            asset_name: twin-macos-arm64.tar.gz
-            asset_content_type: application/gzip
+          # Windows targets
+          - { os: windows-latest , target: x86_64-pc-windows-msvc         , use-cross: false , extension: .exe }
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # Rustのpackage名を取得して環境変数に入れておく
+    - name: Extract crate information
+      shell: bash
+      run: |
+        # Cargo.tomlからバイナリ名を取得（[[bin]]セクションのname）
+        echo "BINARY_NAME=twin" >> $GITHUB_ENV
+        echo "VERSION=${{ needs.create-release.outputs.version }}" >> $GITHUB_ENV
+
+    # Rustツールチェーンのインストール
+    - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        target: ${{ matrix.target }}
-    
-    - name: Build Release Binary
-      run: cargo build --release --target ${{ matrix.target }}
-    
+        targets: ${{ matrix.job.target }}
+
+    # crossのインストール（必要な場合）
+    - name: Install cross
+      if: matrix.job.use-cross
+      shell: bash
+      run: |
+        cargo install cross --git https://github.com/cross-rs/cross
+
+    # ビルド（crossまたはcargoを使用）
+    - name: Build with cross
+      if: matrix.job.use-cross
+      shell: bash
+      run: |
+        cross build --release --target ${{ matrix.job.target }}
+
+    - name: Build with cargo
+      if: ${{ !matrix.job.use-cross }}
+      shell: bash
+      run: |
+        cargo build --release --target ${{ matrix.job.target }}
+
     # Windows用のパッケージング
     - name: Package (Windows)
-      if: matrix.os == 'windows-latest'
+      if: startsWith(matrix.job.os, 'windows')
       shell: powershell
       run: |
-        $version = "${{ needs.create-release.outputs.version }}"
-        $dist = "twin-$version-${{ matrix.target }}"
+        $version = "${{ env.VERSION }}"
+        $target = "${{ matrix.job.target }}"
+        $dist = "twin-$version-$target"
         
         New-Item -ItemType Directory -Force -Path $dist
-        Copy-Item "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" -Destination "$dist/"
+        Copy-Item "target/$target/release/${{ env.BINARY_NAME }}${{ matrix.job.extension }}" -Destination "$dist/"
         Copy-Item "README.md" -Destination "$dist/"
-        Copy-Item "LICENSE" -Destination "$dist/" -ErrorAction SilentlyContinue
+        if (Test-Path "LICENSE") { Copy-Item "LICENSE" -Destination "$dist/" }
         
-        Compress-Archive -Path $dist -DestinationPath "${{ matrix.asset_name }}"
+        Compress-Archive -Path $dist -DestinationPath "twin-$version-$target.zip"
     
     # Unix系用のパッケージング
     - name: Package (Unix)
-      if: matrix.os != 'windows-latest'
+      if: ${{ !startsWith(matrix.job.os, 'windows') }}
+      shell: bash
       run: |
-        version="${{ needs.create-release.outputs.version }}"
-        dist="twin-$version-${{ matrix.target }}"
+        version="${{ env.VERSION }}"
+        target="${{ matrix.job.target }}"
+        dist="twin-$version-$target"
         
         mkdir -p "$dist"
-        cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "$dist/"
+        cp "target/$target/release/${{ env.BINARY_NAME }}${{ matrix.job.extension }}" "$dist/"
         cp README.md "$dist/"
         [ -f LICENSE ] && cp LICENSE "$dist/"
         
-        tar czf "${{ matrix.asset_name }}" "$dist"
-    
-    - name: Upload Release Asset
+        tar czf "twin-$version-$target.tar.gz" "$dist"
+
+    # アセットのアップロード
+    - name: Upload Release Asset (Windows)
+      if: startsWith(matrix.job.os, 'windows')
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
       run: |
-        gh release upload 'v${{ needs.create-release.outputs.version }}' \
-          './${{ matrix.asset_name }}' \
+        gh release upload '${{ github.ref_name }}' \
+          "twin-${{ env.VERSION }}-${{ matrix.job.target }}.zip" \
+          --clobber
+
+    - name: Upload Release Asset (Unix)
+      if: ${{ !startsWith(matrix.job.os, 'windows') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        gh release upload '${{ github.ref_name }}' \
+          "twin-${{ env.VERSION }}-${{ matrix.job.target }}.tar.gz" \
           --clobber
 
   # crates.ioへの公開（2回目以降、Trusted Publishing使用）
-  # 初回は手動で: cargo login && cargo publish
   publish-crates:
     name: Publish to crates.io
-    needs: create-release
+    needs: [create-release, build]
     runs-on: ubuntu-latest
     # v0.2.0以降で有効化（初回v0.1.0は手動公開のため）
     if: ${{ !startsWith(github.ref, 'refs/tags/v0.1.') }}
@@ -162,10 +192,5 @@ jobs:
     
     - name: Publish to crates.io
       # Trusted Publishingを使用（初回公開後に設定）
-      # 設定手順:
-      # 1. 初回は手動で cargo publish
-      # 2. crates.io → Settings → Trusted Publishers
-      # 3. このリポジトリを追加
       run: |
         cargo publish --no-verify
-
