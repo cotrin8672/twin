@@ -1,7 +1,21 @@
 [package]
-name = "twin"
+name = "twin-cli"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Git worktree wrapper with side effects (symlinks and hooks)"
+repository = "https://github.com/yourusername/twin"
+homepage = "https://github.com/yourusername/twin"
+documentation = "https://docs.rs/twin-cli"
+readme = "README.md"
+keywords = ["git", "worktree", "cli", "symlink", "hooks"]
+categories = ["command-line-utilities", "development-tools"]
+license = "MIT"
+
+# バイナリ名は "twin" のまま
+[[bin]]
+name = "twin"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.99"

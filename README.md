@@ -19,12 +19,27 @@ Git worktree コマンドをベースに、以下の副作用を追加しまし�
 
 ## インストール
 
+### Cargo (推奨)
 ```bash
-# Rustがインストールされている場合
-cargo install --path .
+# crates.ioから直接インストール
+cargo install twin-cli
 
-# または、リリースページからバイナリをダウンロード（未実装）
+# または、最新の開発版をGitHubからインストール
+cargo install --git https://github.com/yourusername/twin
 ```
+
+### ソースからビルド
+```bash
+# リポジトリをクローン
+git clone https://github.com/yourusername/twin
+cd twin
+
+# ビルド＆インストール
+cargo install --path .
+```
+
+### バイナリダウンロード
+[Releases](https://github.com/yourusername/twin/releases)ページから、お使いのプラットフォーム用のバイナリをダウンロードできます。
 
 ## 使用方法
 
