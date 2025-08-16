@@ -109,22 +109,6 @@ jobs:
         Copy-Item "README.md" -Destination "$dist/"
         Copy-Item "LICENSE" -Destination "$dist/" -ErrorAction SilentlyContinue
         
-        # サンプル設定ファイル
-        @"
-# Twin設定ファイルサンプル
-# このファイルを .twin.toml として保存してください
-
-[[files]]
-path = ".env.template"
-mapping_type = "copy"
-description = "環境変数設定"
-skip_if_exists = true
-
-[hooks]
-pre_create = []
-post_create = []
-"@ | Out-File -FilePath "$dist/.twin.toml.sample" -Encoding UTF8
-        
         Compress-Archive -Path $dist -DestinationPath "${{ matrix.asset_name }}"
     
     # Unix系用のパッケージング
@@ -138,22 +122,6 @@ post_create = []
         cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "$dist/"
         cp README.md "$dist/"
         [ -f LICENSE ] && cp LICENSE "$dist/"
-        
-        # サンプル設定ファイル
-        cat > "$dist/.twin.toml.sample" << 'EOF'
-# Twin設定ファイルサンプル
-# このファイルを .twin.toml として保存してください
-
-[[files]]
-path = ".env.template"
-mapping_type = "copy"
-description = "環境変数設定"
-skip_if_exists = true
-
-[hooks]
-pre_create = []
-post_create = []
-EOF
         
         tar czf "${{ matrix.asset_name }}" "$dist"
     
