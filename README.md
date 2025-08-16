@@ -1,17 +1,20 @@
-# Twin - Git Worktree Manager
+# Twin - Git Worktree Wrapper with Side Effects
 
-Twin は Git ワークツリーとシンボリックリンクを使用して、複数のエージェント環境を効率的に管理するためのCLIツールです。
+Twin は Git worktree の薄いラッパーで、シンボリックリンクやフックなどの副作用を追加した CLI ツールです。
 
 ## 概要
 
-各AIエージェントや開発環境ごとに独立したワークツリーを作成し、シンボリックリンクを使用して設定ファイルを共有することで、複数の開発環境を簡単に切り替えることができます。
+Git worktree コマンドをベースに、以下の副作用を追加しました：
+- シンボリックリンクの自動作成・削除
+- worktree 作成・削除時のフック実行
+- 設定ファイルによるカスタマイズ
 
 ## 主な機能
 
-- **ワークツリー管理**: Git worktreeを使用した独立した作業環境の作成
+- **Worktree管理**: Git worktreeのラッパーとして動作
 - **シンボリックリンク**: 設定ファイルの共有と環境間での一貫性維持
 - **クロスプラットフォーム**: Windows/macOS/Linuxに対応
-- **フック機能**: 環境作成・削除時のカスタムスクリプト実行
+- **フック機能**: worktree作成・削除時のカスタムスクリプト実行
 - **柔軟な設定**: TOML形式の設定ファイルによるカスタマイズ
 
 ## インストール
@@ -27,25 +30,29 @@ cargo install --path .
 
 ### 基本コマンド
 
-#### 環境の作成
+#### Worktreeの作成（git worktree add のラッパー）
 ```bash
-# 基本的な使用方法（デフォルト: ../ブランチ名）
-twin create feature-new
+# 基本的な使用方法
+twin add <path> [<branch>]
 
-# ディレクトリを指定
-twin create feature-new ../workspaces/feature
+# 新しいブランチを作成
+twin add ../feature-new -b feature-new
 
-# 設定ファイルを指定
-twin create feature-new --config ./custom-config.toml
+# 既存のブランチをチェックアウト
+twin add ../hotfix hotfix-branch
 
-# パスのみ出力（スクリプト用）
-twin create feature-new --print-path
+# 設定ファイルを指定（副作用を適用）
+twin add ../feature --config .twin.toml
 
-# cdコマンド形式で出力
-twin create feature-new --cd-command
+# Git worktree のみ実行（副作用をスキップ）
+twin add ../feature --git-only
+
+# その他の git worktree オプションもサポート
+twin add ../feature --detach
+twin add ../feature --lock
 ```
 
-#### 環境の一覧表示
+#### Worktreeの一覧表示（git worktree list のラッパー）
 ```bash
 # デフォルト（テーブル形式）
 twin list
@@ -57,109 +64,76 @@ twin list --format json
 twin list --format simple
 ```
 
-#### 環境の削除
+#### Worktreeの削除（git worktree remove のラッパー）
 ```bash
-# 通常の削除
+# 通常の削除（ブランチ名またはパスを指定）
 twin remove feature-new
+twin remove ../feature-new
 
 # 強制削除（エラーを無視）
 twin remove feature-new --force
+
+# Git worktree のみ実行（副作用をスキップ）
+twin remove feature-new --git-only
 ```
 
 #### 設定管理
 ```bash
+# デフォルト設定をTOML形式で出力
+twin config default
+
 # 現在の設定を表示
-twin config show
+twin config --show
 
-# 設定例を表示
-twin config example
+# 設定値をセット（未実装）
+twin config --set key=value
 
-# 設定ファイルを初期化（未実装）
-twin config init
-
-# グローバル設定を編集（未実装）
-twin config edit --global
+# 設定値を取得（未実装）
+twin config --get key
 ```
 
 ### 未実装機能
 
 以下の機能は現在未実装です：
 
-- `twin switch` - 環境の切り替え
-- `twin init` - プロジェクトの初期化
-- `twin tui` - インタラクティブUI
-- `twin config init/edit` - 設定ファイルの初期化と編集
-- フック機能の実際の実行
+- `twin config --set/--get` - 設定値の取得・設定
+- テンプレート処理
 
 ## 設定ファイル
 
-Twin は `twin.toml` という設定ファイルを使用します。プロジェクトルートまたはホームディレクトリに配置できます。
+Twin は `.twin.toml` という設定ファイルを使用して副作用を定義します。
 
 ### 設定ファイルの例
 
 ```toml
-# twin.toml - Twin設定ファイルの例
+# .twin.toml - Twin設定ファイルの例
 
-# ワークツリーのベースディレクトリ（デフォルト: "../"）
-# この設定を使用すると、作成されるディレクトリは "worktree_base/ブランチ名" になります
-worktree_base = "../workspaces"
-
-# ブランチ名のプレフィックス（削除済み機能）
-# この設定は現在使用されていません
+# Worktreeのベースディレクトリ（省略時: ../ブランチ名）
+# worktree_base = "../workspaces"
 
 # ファイルマッピング設定
+# Worktree作成時に自動的にシンボリックリンクやコピーを作成します
 [[files]]
-# ソースファイル（テンプレートまたは共有ファイル）
-source = ".claude/config.template.json"
-# ターゲットパス（ワークツリー内の配置先）
-target = ".claude/config.json"
-# マッピングタイプ
-# - "symlink": シンボリックリンク（デフォルト）
-# - "copy": ファイルコピー
-# - "template": テンプレート処理（未実装）
+path = ".env.template"          # ソースファイルのパス
+mapping_type = "copy"           # "symlink" または "copy"
+description = "環境変数設定"     # 説明（省略可）
+skip_if_exists = true           # 既存ファイルをスキップ（省略可）
+
+[[files]]
+path = ".claude/config.json"
 mapping_type = "symlink"
-# ファイルが既に存在する場合はスキップ
-skip_if_exists = true
-# このマッピングの説明
 description = "Claude設定ファイル"
 
-[[files]]
-source = ".env.template"
-target = ".env"
-mapping_type = "copy"
-skip_if_exists = true
-description = "環境変数設定"
-
-[[files]]
-source = "shared/hooks"
-target = ".git/hooks"
-mapping_type = "symlink"
-skip_if_exists = false
-description = "Gitフック"
-
-# フック設定
+# フック設定（worktree作成・削除時に実行するコマンド）
 [hooks]
-# 環境作成前に実行
 pre_create = [
-    { command = "echo 'Creating branch: {branch}'", continue_on_error = false },
-    { command = "npm install", continue_on_error = true, timeout = 300 }
+  { command = "echo", args = ["Creating: {{branch}}"] }
 ]
-
-# 環境作成後に実行
 post_create = [
-    { command = "echo 'Branch {branch} created successfully'", continue_on_error = false },
-    { command = "code {worktree_path}", continue_on_error = true }
+  { command = "npm", args = ["install"], continue_on_error = true }
 ]
-
-# 環境削除前に実行
-pre_remove = [
-    { command = "echo 'Removing branch: {branch}'", continue_on_error = false }
-]
-
-# 環境削除後に実行
-post_remove = [
-    { command = "echo 'Branch {branch} removed'", continue_on_error = false }
-]
+pre_remove = []
+post_remove = []
 ```
 
 ### 設定項目の詳細
@@ -168,9 +142,8 @@ post_remove = [
 
 | フィールド | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
-| `source` | string | ✓ | ソースファイルのパス |
-| `target` | string | ✓ | ターゲットファイルのパス（ワークツリー内） |
-| `mapping_type` | string | - | "symlink", "copy", "template"（デフォルト: "symlink"） |
+| `path` | string | ✓ | ファイルパス（メインリポジトリとworktreeで同じパス） |
+| `mapping_type` | string | - | "symlink" または "copy"（デフォルト: "symlink"） |
 | `skip_if_exists` | bool | - | 既存ファイルをスキップ（デフォルト: false） |
 | `description` | string | - | マッピングの説明 |
 
@@ -178,7 +151,8 @@ post_remove = [
 
 | フィールド | 型 | 必須 | 説明 |
 |-----------|-----|------|------|
-| `command` | string | ✓ | 実行するコマンド（`{branch}`はブランチ名、`{worktree_path}`はパスに置換） |
+| `command` | string | ✓ | 実行するコマンド |
+| `args` | array | - | コマンド引数（`{{branch}}`、`{{worktree_path}}`などの変数を使用可） |
 | `continue_on_error` | bool | - | エラー時も続行（デフォルト: false） |
 | `timeout` | u64 | - | タイムアウト秒数（デフォルト: 60） |
 
@@ -201,9 +175,9 @@ post_remove = [
 3. **ファイルコピーモードを使用する**
    - 設定ファイルで `mapping_type = "copy"` を指定
 
-### ワークツリーが作成できない
+### Worktreeが作成できない
 
-**問題**: 「ワークツリーの作成に失敗しました」というエラー
+**問題**: 「Worktreeの作成に失敗しました」というエラー
 
 **考えられる原因と解決方法**:
 
@@ -217,15 +191,21 @@ post_remove = [
    # ブランチを確認
    git branch -a
    # 別の名前を指定
-   twin create agent-001 --branch feature/another-name
+   twin add ../agent-001 -b feature/another-name
+   # または強制的にブランチを再作成
+   twin add ../agent-001 -B feature/new-name
    ```
 
-3. **ワークツリーが既に存在する**
+3. **Worktreeが既に存在する**
    ```bash
-   # ワークツリーを確認
+   # Worktreeを確認
+   twin list
+   # または
    git worktree list
-   # 既存のワークツリーを削除
-   git worktree remove worktrees/agent-001
+   # 既存のWorktreeを削除
+   twin remove ../agent-001
+   # または
+   git worktree remove ../agent-001
    ```
 
 ### 設定ファイルが読み込まれない
@@ -235,13 +215,12 @@ post_remove = [
 **確認事項**:
 
 1. **設定ファイルの場所**
-   - プロジェクトルート: `./twin.toml`
-   - ホームディレクトリ: `~/.config/twin/config.toml`（未実装）
+   - プロジェクトルート: `./.twin.toml`
 
 2. **設定ファイルの形式**
    ```bash
-   # 設定例を確認
-   twin config example
+   # デフォルト設定を確認
+   twin config default
    ```
 
 3. **TOML構文エラー**
@@ -255,33 +234,29 @@ post_remove = [
 
 ```bash
 # 詳細ログを表示
-export TWIN_DEBUG=1
-twin create agent-001
+export RUST_LOG=debug
+twin add ../agent-001 -b feature/test
 
-# 実行コマンドを表示（dry-run）
-export TWIN_DRY_RUN=1
-twin create agent-001
+# Gitのみ実行（副作用をスキップ）
+twin add ../agent-001 --git-only
 ```
 
 ## 開発状況
 
 ### 実装済み機能
 
-- ✅ 基本的なワークツリー管理（create, list, remove）
-- ✅ シンボリックリンク作成（Unix/Windows対応）
-- ✅ 設定ファイル読み込み
+- ✅ Git worktree コマンドのラッパー（add, list, remove）
+- ✅ シンボリックリンク作成・削除（Unix/Windows対応）
+- ✅ フック実行（pre/post create/remove）
+- ✅ 設定ファイル読み込み（.twin.toml）
 - ✅ 複数の出力形式（table, json, simple）
 - ✅ エラーハンドリング
+- ✅ --git-only オプション（副作用をスキップ）
 
 ### 未実装機能
 
-- ⏳ 環境切り替え（switch）
-- ⏳ プロジェクト初期化（init）
-- ⏳ インタラクティブUI（TUI）
-- ⏳ フック実行
 - ⏳ テンプレート処理
-- ⏳ グローバル設定
-- ⏳ 設定マージ機能
+- ⏳ 設定値の取得・設定（config --set/--get）
 
 ## ライセンス
 
