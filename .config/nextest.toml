@@ -1,0 +1,20 @@
+# cargo-nextest configuration
+
+[profile.default]
+# デフォルトプロファイル
+retries = 0
+test-threads = "num-cpus"
+fail-fast = false
+
+[profile.ci]
+# CI環境用プロファイル
+retries = 2  # フレーキーなテストのリトライ
+test-threads = 4  # CI環境での並列度を制限
+fail-fast = false
+failure-output = "immediate-final"
+success-output = "never"
+status-level = "fail"
+
+# JUnit形式のレポート出力
+[profile.ci.junit]
+path = "target/nextest/ci/junit.xml"

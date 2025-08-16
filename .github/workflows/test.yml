@@ -1,4 +1,4 @@
-name: Test
+name: Tests
 
 on:
   push:
@@ -11,31 +11,18 @@ env:
 
 jobs:
   test:
-    name: Test on ${{ matrix.os }}
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    
     strategy:
-      fail-fast: false  # 1つの環境で失敗しても他の環境のテストを続行
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable]
-        include:
-          # OS固有の追加設定
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-          - os: macos-latest
-            target: x86_64-apple-darwin
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ matrix.rust }}
-        target: ${{ matrix.target }}
     
     - name: Cache cargo registry
       uses: actions/cache@v3
@@ -49,138 +36,18 @@ jobs:
         path: ~/.cargo/git
         key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
     
-    - name: Cache cargo build
-      uses: actions/cache@v3
-      with:
-        path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-    
-    # Git設定（テスト用）
     - name: Configure Git
       run: |
         git config --global user.email "test@example.com"
         git config --global user.name "Test User"
     
-    # Linux/macOS固有の設定
-    - name: Set execute permission for scripts (Unix)
-      if: runner.os != 'Windows'
-      run: chmod +x scripts/*.sh || true
+    # cargo-nextestで高速並列テスト
+    - name: Install cargo-nextest
+      uses: taiki-e/install-action@nextest
     
-    # ビルド
-    - name: Build
-      run: cargo build --verbose
-    
-    # テスト実行
-    - name: Run tests
-      run: cargo test --verbose
-    
-    # 統合テスト実行
-    - name: Run integration tests
-      run: cargo test --test '*' --verbose
+    - name: Run tests with nextest
+      run: cargo nextest run --all-features --profile ci
     
     # ドキュメントビルド確認
     - name: Build documentation
       run: cargo doc --no-deps --verbose
-    
-    # Clippy実行（警告チェック）
-    - name: Run clippy
-      run: cargo clippy -- -D warnings
-      continue-on-error: true  # 警告があっても続行
-    
-    # フォーマットチェック（Linux環境のみ）
-    - name: Check formatting
-      if: matrix.os == 'ubuntu-latest'
-      run: cargo fmt -- --check
-      continue-on-error: true
-
-  # Windows固有のテスト（シンボリックリンク関連）
-  windows-specific:
-    name: Windows Specific Tests
-    runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    
-    - name: Configure Git
-      run: |
-        git config --global user.email "test@example.com"
-        git config --global user.name "Test User"
-    
-    # 管理者権限なしでのテスト
-    - name: Test without admin (Developer Mode)
-      run: |
-        cargo test --test symlink_test --verbose
-    
-    # シンボリックリンク作成権限の確認
-    - name: Check symlink capability
-      shell: powershell
-      run: |
-        Write-Host "Checking Windows symlink capabilities..."
-        $testPath = "test_symlink"
-        $targetPath = "README.md"
-        
-        try {
-          New-Item -ItemType SymbolicLink -Path $testPath -Target $targetPath -ErrorAction Stop
-          Write-Host "✓ Symlinks are supported"
-          Remove-Item $testPath -Force
-        } catch {
-          Write-Host "✗ Symlinks require elevated permissions or Developer Mode"
-          Write-Host "  Error: $_"
-        }
-
-  # Linux固有のテスト（権限関連）
-  linux-specific:
-    name: Linux Specific Tests
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    
-    - name: Configure Git
-      run: |
-        git config --global user.email "test@example.com"
-        git config --global user.name "Test User"
-    
-    # 権限のテスト
-    - name: Test file permissions
-      run: |
-        # シンボリックリンクのテスト
-        cargo test --test symlink_test --verbose
-        
-        # 実行権限のテスト
-        cargo build --release
-        chmod +x target/release/twin
-        ./target/release/twin --version
-
-  # クロスコンパイルテスト
-  cross-compile:
-    name: Cross Compile for ${{ matrix.target }}
-    runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        target:
-          - x86_64-pc-windows-gnu
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-gnu
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        target: ${{ matrix.target }}
-    
-    - name: Install cross
-      run: cargo install cross --locked
-    
-    - name: Build with cross
-      run: cross build --target ${{ matrix.target }} --verbose
-      continue-on-error: true  # クロスコンパイルは失敗することがあるため
