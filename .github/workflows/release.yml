@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write  # リリース作成に必要
+  id-token: write  # Trusted Publishing用のOIDCトークン
 
 jobs:
   # リリースの作成
@@ -165,6 +166,32 @@ EOF
         asset_path: ./${{ matrix.asset_name }}
         asset_name: ${{ matrix.asset_name }}
         asset_content_type: ${{ matrix.asset_content_type }}
+
+  # crates.ioへの公開（Trusted Publishing使用）
+  publish-crates:
+    name: Publish to crates.io
+    needs: create-release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Verify package
+      run: |
+        cargo package --no-verify
+        cargo package --list
+    
+    - name: Publish to crates.io
+      # Trusted Publishingを使用するため、API tokenは不要
+      # 事前にcrates.ioの設定でこのリポジトリを許可リストに追加する必要があります
+      run: |
+        cargo publish --no-verify
+      env:
+        # Trusted Publishingが有効な場合、この環境変数は自動的に設定されます
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   # Scoopマニフェストの更新
   update-scoop:
