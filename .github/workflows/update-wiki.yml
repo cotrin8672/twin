@@ -151,8 +151,17 @@ jobs:
             -m "Date: ${COMMIT_DATE}" \
             -m "Workflow: ${{ github.workflow }} #${{ github.run_number }}"
           
-          # Push to wiki
-          git push origin master 2>/dev/null || git push origin main
+          # Push to wiki (try master first for new wikis, then main)
+          if git ls-remote --heads origin master > /dev/null 2>&1; then
+            echo "Pushing to existing master branch..."
+            git push origin HEAD:master
+          elif git ls-remote --heads origin main > /dev/null 2>&1; then
+            echo "Pushing to existing main branch..."
+            git push origin HEAD:main
+          else
+            echo "Creating new master branch..."
+            git push origin HEAD:master
+          fi
       
       - name: Create Summary
         if: always()
