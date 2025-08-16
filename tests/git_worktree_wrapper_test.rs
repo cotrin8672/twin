@@ -55,10 +55,10 @@ fn get_twin_binary() -> String {
     twin_path.to_string_lossy().to_string()
 }
 
-/// ユニークなワークツリーパスを生成
+/// ユニークなワークツリーパスを生成（リポジトリ内に作成）
 fn unique_worktree_path(name: &str) -> String {
     let id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
-    format!("../test-{}-{}", name, id)
+    format!("wt-{}-{}", name, id)
 }
 
 // =============================================================================
@@ -98,7 +98,7 @@ fn test_add_command_basic() {
         .expect("Failed to list worktrees");
 
     let list_stdout = String::from_utf8_lossy(&list_output.stdout);
-    assert!(list_stdout.contains(&worktree_path[3..])); // "../" を除いた部分
+    assert!(list_stdout.contains(&worktree_path));
     assert!(list_stdout.contains("test-branch"));
 }
 
@@ -251,7 +251,7 @@ fn test_no_checkout_option() {
     );
 
     // worktreeディレクトリが空であることを確認
-    let worktree_full_path = repo.path().parent().unwrap().join(&worktree_path[3..]);
+    let worktree_full_path = repo.path().join(&worktree_path);
     let entries: Vec<_> = fs::read_dir(&worktree_full_path)
         .expect("Failed to read worktree dir")
         .collect();
@@ -315,7 +315,7 @@ mapping_type = "symlink"
     assert!(output.status.success());
 
     // シンボリックリンクが作成されていないことを確認
-    let worktree_full_path = repo.path().parent().unwrap().join(&worktree_path[3..]);
+    let worktree_full_path = repo.path().join(&worktree_path);
     assert!(!worktree_full_path.join("test.txt").exists());
 }
 
@@ -386,7 +386,7 @@ fn test_list_includes_manual_worktree() {
 
     // 手動でgit worktreeを作成
     Command::new("git")
-        .args(["worktree", "add", &worktree_path[3..], "-b", "manual-branch"])
+        .args(["worktree", "add", &worktree_path, "-b", "manual-branch"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create manual worktree");
@@ -416,14 +416,14 @@ fn test_remove_manual_worktree() {
 
     // 手動でgit worktreeを作成
     Command::new("git")
-        .args(["worktree", "add", &worktree_path[3..], "-b", "to-remove"])
+        .args(["worktree", "add", &worktree_path, "-b", "to-remove"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to create manual worktree");
 
     // twin removeを実行
     let output = Command::new(&twin)
-        .args(["remove", &worktree_path[3..], "--force"])
+        .args(["remove", &worktree_path, "--force"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to execute twin remove");
@@ -454,7 +454,7 @@ fn test_output_matches_git_worktree() {
 
     // git worktree addを直接実行
     let git_output = Command::new("git")
-        .args(["worktree", "add", &worktree_path1[3..], "-b", "git-branch"])
+        .args(["worktree", "add", &worktree_path1, "-b", "git-branch"])
         .current_dir(repo.path())
         .output()
         .expect("Failed to execute git worktree add");

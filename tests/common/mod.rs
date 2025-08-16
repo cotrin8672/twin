@@ -7,6 +7,8 @@ use tempfile::TempDir;
 pub struct TestRepo {
     temp_dir: TempDir,
     pub test_id: String,
+    /// 作成されたworktreeのパスを記録
+    created_worktrees: std::sync::Mutex<Vec<PathBuf>>,
 }
 
 impl TestRepo {
@@ -52,6 +54,7 @@ impl TestRepo {
         Self {
             temp_dir,
             test_id,
+            created_worktrees: std::sync::Mutex::new(Vec::new()),
         }
     }
     
@@ -76,7 +79,16 @@ impl TestRepo {
     
     /// 一意のworktreeパスを生成
     pub fn worktree_path(&self, name: &str) -> String {
-        format!("../test-{}-{}", name, self.test_id)
+        let path_str = format!("../test-{}-{}", name, self.test_id);
+        // worktreeの絶対パスを記録
+        if let Ok(abs_path) = self.temp_dir.path().parent().unwrap().join(&path_str[3..]).canonicalize() {
+            self.created_worktrees.lock().unwrap().push(abs_path);
+        } else {
+            // まだ存在しない場合は予想される絶対パスを記録
+            let expected_path = self.temp_dir.path().parent().unwrap().join(&path_str[3..]);
+            self.created_worktrees.lock().unwrap().push(expected_path);
+        }
+        path_str
     }
     
     /// テストリポジトリのパスを取得
@@ -92,4 +104,26 @@ impl TestRepo {
     }
 }
 
-// TempDirは自動的にDropでクリーンアップされる
+// Dropトレイトを実装してworktreeもクリーンアップ
+impl Drop for TestRepo {
+    fn drop(&mut self) {
+        // 作成されたworktreeを削除
+        let worktrees = self.created_worktrees.lock().unwrap();
+        for worktree_path in worktrees.iter() {
+            if worktree_path.exists() {
+                // git worktree removeを試みる
+                Command::new("git")
+                    .args(&["worktree", "remove", "--force", &worktree_path.to_string_lossy()])
+                    .current_dir(self.temp_dir.path())
+                    .output()
+                    .ok();
+                
+                // それでも残っている場合は直接削除
+                if worktree_path.exists() {
+                    std::fs::remove_dir_all(worktree_path).ok();
+                }
+            }
+        }
+        // TempDirは自動的にDropでクリーンアップされる
+    }
+}
