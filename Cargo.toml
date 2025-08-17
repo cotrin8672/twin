@@ -1,6 +1,6 @@
 [package]
 name = "twin-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["cotrin <cotrin8672@users.noreply.github.com>"]
 description = "Git worktree wrapper with side effects (symlinks and hooks)"
