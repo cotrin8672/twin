@@ -65,6 +65,7 @@ async fn test_hooks_execution_on_add() {
         quiet: false,
         print_path: false,
         cd_command: false,
+        no_create: false,
     };
 
     // フックが実行されることを確認（エラーが出ないこと）
@@ -117,6 +118,7 @@ async fn test_hooks_execution_on_remove() {
         quiet: true,
         print_path: false,
         cd_command: false,
+        no_create: false,
     };
 
     let result = handle_add(add_args).await;
@@ -178,6 +180,7 @@ pre_create = [
         quiet: false,
         print_path: false,
         cd_command: false,
+        no_create: false,
     };
 
     // continue_on_error=trueなのでworktree作成は成功するはず
@@ -219,6 +222,7 @@ pre_create = [
         quiet: false,
         print_path: false,
         cd_command: false,
+        no_create: false,
     };
 
     // フックが失敗してworktree作成も失敗するはず

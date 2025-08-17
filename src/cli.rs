@@ -20,7 +20,7 @@ pub struct Cli {
 /// 利用可能なサブコマンドの定義
 #[derive(Subcommand)]
 pub enum Commands {
-    /// ワークツリーを追加（簡易版: twin add <ブランチ名> [パス]）
+    /// ワークツリーを追加（デフォルトで新規ブランチを作成）
     Add(AddArgs),
 
     /// ワークツリーを追加（addのエイリアス、後方互換性のため）
@@ -108,6 +108,10 @@ pub struct AddArgs {
     /// twin固有: 副作用をスキップしてgit worktreeのみ実行
     #[arg(long)]
     pub git_only: bool,
+
+    /// twin固有: ブランチの新規作成を無効化（既存ブランチのみ使用）
+    #[arg(long, help = "既存のブランチのみを使用し、新規ブランチを作成しない")]
+    pub no_create: bool,
 }
 
 /// listコマンドの引数

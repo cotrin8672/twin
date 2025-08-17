@@ -53,10 +53,21 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     } else if let Some(branch) = &args.force_branch {
         worktree_args.push("-B");
         worktree_args.push(branch.as_str());
-    } else if !branch_exists && !args.detach {
-        // ブランチが存在しない場合は自動的に-bオプションを追加
-        worktree_args.push("-b");
+    } else if !args.no_create && !args.detach {
+        // デフォルトで新規ブランチを作成（--no-createオプションで無効化可能）
+        // ブランチが存在しない場合は-b、存在する場合は-Bを使用
+        if !branch_exists {
+            worktree_args.push("-b");
+        } else {
+            worktree_args.push("-B");
+        }
         worktree_args.push(args.branch.as_str());
+    } else if !branch_exists && !args.detach && args.no_create {
+        // --no-createが指定されていて、ブランチが存在しない場合はエラー
+        return Err(TwinError::git(format!(
+            "Branch '{}' does not exist. Use without --no-create to create it automatically.",
+            args.branch
+        )));
     }
     if args.detach {
         worktree_args.push("--detach");
