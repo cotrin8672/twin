@@ -37,17 +37,26 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
         }
     };
 
+    // Git worktreeを作成
+    let mut git = GitManager::new(std::path::Path::new("."))?;
+
     // git worktree addの引数を構築
     let mut worktree_args = Vec::new();
+
+    // ブランチが存在するかチェック
+    let branch_exists = git.branch_exists(&args.branch)?;
 
     // オプションを追加
     if let Some(branch) = &args.new_branch {
         worktree_args.push("-b");
         worktree_args.push(branch.as_str());
-    }
-    if let Some(branch) = &args.force_branch {
+    } else if let Some(branch) = &args.force_branch {
         worktree_args.push("-B");
         worktree_args.push(branch.as_str());
+    } else if !branch_exists && !args.detach {
+        // ブランチが存在しない場合は自動的に-bオプションを追加
+        worktree_args.push("-b");
+        worktree_args.push(args.branch.as_str());
     }
     if args.detach {
         worktree_args.push("--detach");
@@ -80,7 +89,21 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
 
     // ブランチ/コミットを追加
     let branch_str = args.branch.clone();
-    worktree_args.push(&branch_str);
+
+    // 新規ブランチ作成の場合、ブランチ参照は-b/-Bオプションで既に指定済み
+    // detachモードの場合、HEADをブランチ参照として使用
+    if args.new_branch.is_none() && args.force_branch.is_none() {
+        if !branch_exists && !args.detach {
+            // ブランチが存在しない場合（既に-bオプションを追加済み）
+            // ブランチ参照は不要
+        } else if args.detach {
+            // detachモードの場合、HEADを使用
+            worktree_args.push("HEAD");
+        } else {
+            // 既存のブランチを参照
+            worktree_args.push(&branch_str);
+        }
+    }
 
     // worktreeのパスを正規化（絶対パスに）
     let worktree_path_absolute = if worktree_path.is_relative() {
@@ -107,9 +130,6 @@ pub async fn handle_add(args: AddArgs) -> TwinResult<()> {
     } else {
         worktree_path.clone()
     };
-
-    // Git worktreeを作成
-    let mut git = GitManager::new(std::path::Path::new("."))?;
 
     // git_onlyモードの場合は副作用をスキップ
     if args.git_only {

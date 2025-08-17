@@ -10,9 +10,9 @@ use tempfile::TempDir;
 fn setup_test_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
 
-    // Gitリポジトリを初期化
+    // Gitリポジトリを初期化（デフォルトブランチ名を明示的に指定）
     Command::new("git")
-        .args(["init"])
+        .args(["init", "-b", "main"])
         .current_dir(dir.path())
         .output()
         .expect("Failed to init git repo");
@@ -228,16 +228,28 @@ fn test_no_checkout_option() {
     let worktree_path = unique_worktree_path("nocheckout");
 
     // --no-checkoutオプションでworktreeを作成
+    // twin add <branch> [path] のフォーマット
     let output = Command::new(&twin)
-        .args(["add", &worktree_path, "-b", "empty-branch", "--no-checkout"])
+        .args([
+            "add",
+            "empty-branch",
+            &worktree_path,
+            "-b",
+            "empty-branch",
+            "--no-checkout",
+        ])
         .current_dir(repo.path())
         .output()
         .expect("Failed to execute twin add");
 
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    println!("STDOUT: {stdout}");
+    println!("STDERR: {stderr}");
+
     assert!(
         output.status.success(),
-        "No-checkout should succeed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        "No-checkout should succeed: {stderr}",
     );
 
     // worktreeディレクトリが空であることを確認

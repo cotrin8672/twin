@@ -16,9 +16,11 @@ fn test_git_worktree_operations() {
     let repo = TestRepo::new();
 
     // ブランチ作成を伴うworktree追加
+    let worktree_path = repo.worktree_path("feature");
     let output = repo.run_twin(&[
         "add",
-        &repo.worktree_path("feature"),
+        "feature/test-1",
+        &worktree_path,
         "-b",
         "feature/test-1",
     ]);
@@ -40,9 +42,11 @@ fn test_git_worktree_operations() {
     assert!(worktrees.contains("branch refs/heads/feature/test-1"));
 
     // 既存ブランチでのworktree作成（エラーになるはず）
+    let another_path = repo.worktree_path("another");
     let output = repo.run_twin(&[
         "add",
-        &repo.worktree_path("another"),
+        "feature/test-1",
+        &another_path,
         "-b",
         "feature/test-1",
     ]);
@@ -50,7 +54,14 @@ fn test_git_worktree_operations() {
 
     // -Bオプションで強制作成
     repo.exec(&["git", "branch", "existing-branch"]);
-    let output = repo.run_twin(&["add", &repo.worktree_path("force"), "-B", "existing-branch"]);
+    let worktree_path = repo.worktree_path("force");
+    let output = repo.run_twin(&[
+        "add",
+        "existing-branch",
+        &worktree_path,
+        "-B",
+        "existing-branch",
+    ]);
     assert!(output.status.success());
 }
 
@@ -82,7 +93,8 @@ mapping_type = "symlink"
     let worktree_path_str = repo.worktree_path("with-symlinks");
     let output = repo.run_twin(&[
         "add",
-        &worktree_path_str,
+        "feature/symlinks", // ブランチ名が最初の位置引数
+        &worktree_path_str, // パスが2番目の位置引数
         "-b",
         "feature/symlinks",
         "--config",
@@ -108,7 +120,13 @@ fn test_no_symlinks_without_config() {
 
     // 設定ファイルを指定せずにworktree作成
     let worktree_path_str = repo.worktree_path("no-symlinks");
-    let output = repo.run_twin(&["add", &worktree_path_str, "-b", "feature/no-symlinks"]);
+    let output = repo.run_twin(&[
+        "add",
+        "feature/no-symlinks",
+        &worktree_path_str,
+        "-b",
+        "feature/no-symlinks",
+    ]);
     assert!(output.status.success());
 
     // シンボリックリンクが作成されていないことを確認
@@ -135,9 +153,11 @@ post_create = [
     std::fs::write(repo.path().join(".twin.toml"), config).unwrap();
 
     // フックを含むworktree作成
+    let worktree_path = repo.worktree_path("with-hooks");
     let output = repo.run_twin(&[
         "add",
-        &repo.worktree_path("with-hooks"),
+        "feature/hooks",
+        &worktree_path,
         "-b",
         "feature/hooks",
         "--config",
@@ -159,7 +179,13 @@ fn test_worktree_removal() {
 
     // worktreeを作成
     let worktree_path = repo.worktree_path("to-remove");
-    let output = repo.run_twin(&["add", &worktree_path, "-b", "feature/removal"]);
+    let output = repo.run_twin(&[
+        "add",
+        "feature/removal",
+        &worktree_path,
+        "-b",
+        "feature/removal",
+    ]);
     assert!(output.status.success());
 
     // worktreeが存在することを確認
@@ -189,9 +215,27 @@ fn test_complete_workflow() {
     let work1_path_str = repo.worktree_path("work-1");
     let work2_path_str = repo.worktree_path("work-2");
     let work3_path_str = repo.worktree_path("work-3");
-    repo.run_twin(&["add", &work1_path_str, "-b", "feature/work-1"]);
-    repo.run_twin(&["add", &work2_path_str, "-b", "feature/work-2"]);
-    repo.run_twin(&["add", &work3_path_str, "-b", "feature/work-3"]);
+    repo.run_twin(&[
+        "add",
+        "feature/work-1",
+        &work1_path_str,
+        "-b",
+        "feature/work-1",
+    ]);
+    repo.run_twin(&[
+        "add",
+        "feature/work-2",
+        &work2_path_str,
+        "-b",
+        "feature/work-2",
+    ]);
+    repo.run_twin(&[
+        "add",
+        "feature/work-3",
+        &work3_path_str,
+        "-b",
+        "feature/work-3",
+    ]);
 
     // 特定のworktreeで作業
     let work1_path = repo.path().parent().unwrap().join(&work1_path_str[3..]);

@@ -18,9 +18,9 @@ impl TestRepo {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let test_id = uuid::Uuid::new_v4().to_string()[0..8].to_string();
 
-        // Gitリポジトリを初期化
+        // Gitリポジトリを初期化（デフォルトブランチ名を明示的に指定）
         Command::new("git")
-            .args(["init"])
+            .args(["init", "-b", "main"])
             .current_dir(temp_dir.path())
             .output()
             .expect("Failed to init git repo");

@@ -1,0 +1,258 @@
+# twin.toml.example - Twin Configuration File Template (English)
+# Copy this file as twin.toml to use
+
+# ====================
+# Basic Settings
+# ====================
+
+# Base directory for creating worktrees
+# Default: "./worktrees"
+# Relative or absolute paths are supported
+# This is used when path is not specified in 'twin add' command
+worktree_base = "./worktrees"
+
+# Git branch name prefix (optional)
+# Default: none
+# Example: With "agent/" prefix, agent-001 → agent/agent-001 branch will be created
+# branch_prefix = "agent/"
+
+# Default branch to use when creating new worktrees (optional)
+# If not specified, uses the current branch
+# default_branch = "main"
+
+# ====================
+# File Mapping Settings
+# ====================
+# Define files and directories to share across environments
+# Choose from symlink, copy, or template processing
+
+# Example 1: Share configuration file via symlink
+[[files]]
+source = ".claude/config.template.json"  # Source file path
+target = ".claude/config.json"           # Destination in worktree
+mapping_type = "symlink"                 # Mapping type (symlink/copy/template)
+skip_if_exists = true                    # Skip if file already exists
+description = "Claude AI configuration file"
+
+# Example 2: Copy environment variables file (editable per environment)
+[[files]]
+source = ".env.template"
+target = ".env"
+mapping_type = "copy"                    # Copy and place
+skip_if_exists = true                    # Don't overwrite existing .env
+description = "Environment variables"
+
+# Example 3: Share VSCode settings
+[[files]]
+source = ".vscode/settings.template.json"
+target = ".vscode/settings.json"
+mapping_type = "symlink"
+skip_if_exists = false                   # Always overwrite
+description = "VSCode settings"
+
+# Example 4: Share Git hooks
+[[files]]
+source = "shared/hooks"
+target = ".git/hooks"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "Shared Git hooks"
+
+# Example 5: npm package configuration
+[[files]]
+source = "package.json"
+target = "package.json"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "npm dependencies"
+
+# Example 6: Docker configuration
+[[files]]
+source = "docker-compose.template.yml"
+target = "docker-compose.yml"
+mapping_type = "copy"
+skip_if_exists = true
+description = "Docker Compose configuration"
+
+# Example 7: Kiro specifications (for AI-driven development)
+[[files]]
+source = ".kiro"
+target = ".kiro"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "Kiro spec-driven development files"
+
+# ====================
+# Hook Settings
+# ====================
+# Define commands to execute during environment creation/deletion
+# {name} will be replaced with the environment name (agent name)
+# {path} will be replaced with the worktree path
+# {branch} will be replaced with the branch name
+
+[hooks]
+
+# Commands to execute before creating environment
+pre_create = [
+    # Log output
+    { 
+        command = "echo '🚀 Creating worktree: {name} at {path}'", 
+        continue_on_error = false,
+        description = "Display creation message"
+    },
+    
+    # Create necessary directories
+    { 
+        command = "mkdir -p {path}/.cache {path}/tmp", 
+        continue_on_error = true,
+        description = "Create cache directories"
+    }
+]
+
+# Commands to execute after creating environment
+post_create = [
+    # Success message
+    { 
+        command = "echo '✅ Worktree {name} created successfully at {path}'", 
+        continue_on_error = false,
+        description = "Display success message"
+    },
+    
+    # Install dependencies (if package.json exists)
+    { 
+        command = "cd {path} && [ -f package.json ] && npm install || true", 
+        continue_on_error = true,
+        timeout = 300,  # 5 minutes timeout
+        description = "Install npm dependencies"
+    },
+    
+    # Git configuration for the worktree
+    { 
+        command = "cd {path} && git config user.email 'agent-{name}@example.com'", 
+        continue_on_error = true,
+        description = "Set Git user email for worktree"
+    },
+    
+    # Open in VS Code (optional)
+    { 
+        command = "code {path}", 
+        continue_on_error = true,
+        enabled = false,  # Disabled by default
+        description = "Open worktree in VS Code"
+    },
+    
+    # Run initialization script (if exists)
+    { 
+        command = "[ -f ./scripts/setup-environment.sh ] && ./scripts/setup-environment.sh {name} {path} || true", 
+        continue_on_error = true,
+        timeout = 120,
+        description = "Run environment setup script"
+    }
+]
+
+# Commands to execute before removing environment
+pre_remove = [
+    # Warning message
+    { 
+        command = "echo '⚠️  Removing worktree: {name} from {path}'", 
+        continue_on_error = false,
+        description = "Display removal warning"
+    },
+    
+    # Create backup (optional)
+    { 
+        command = "[ -d ./backups ] && tar -czf ./backups/{name}-$(date +%Y%m%d-%H%M%S).tar.gz {path}/.env {path}/data 2>/dev/null || true", 
+        continue_on_error = true,
+        enabled = false,  # Disabled by default
+        description = "Backup environment data"
+    },
+    
+    # Stop running processes
+    { 
+        command = "pkill -f '{path}' || true", 
+        continue_on_error = true,
+        enabled = false,  # Disabled by default
+        description = "Kill processes in worktree"
+    }
+]
+
+# Commands to execute after removing environment
+post_remove = [
+    # Completion message
+    { 
+        command = "echo '🗑️  Worktree {name} removed from {path}'", 
+        continue_on_error = false,
+        description = "Display removal completion"
+    },
+    
+    # Clear cache
+    { 
+        command = "rm -rf /tmp/cache-{name} 2>/dev/null || true", 
+        continue_on_error = true,
+        description = "Clear temporary cache"
+    }
+]
+
+# ====================
+# Advanced Settings (Not Yet Implemented)
+# ====================
+
+# Template processing with variable substitution
+# [[files]]
+# source = "config.template"
+# target = "config.json"
+# mapping_type = "template"
+# variables = { 
+#     api_key = "${API_KEY}",
+#     environment = "{name}",
+#     port = "3000"
+# }
+
+# Conditional mapping based on OS or environment
+# [[files]]
+# source = "windows-config.json"
+# target = ".config/app.json"
+# mapping_type = "copy"
+# condition = "os.platform == 'windows'"
+
+# Environment-specific hooks
+# [hooks.environments.production]
+# pre_create = [
+#     { command = "echo 'Setting up production environment'", continue_on_error = false }
+# ]
+
+# Grouped hooks for specific features
+# [hooks.groups.database]
+# pre_create = [
+#     { command = "docker-compose up -d postgres", continue_on_error = false },
+#     { command = "npm run db:migrate", continue_on_error = false }
+# ]
+
+# ====================
+# Settings Structure (Optional)
+# ====================
+
+[settings]
+# Base directory for worktrees (same as worktree_base above)
+worktree_base = "./worktrees"
+
+# Enable verbose output
+# verbose = true
+
+# Enable dry-run mode (don't execute commands, just show what would be done)
+# dry_run = false
+
+# Default timeout for hook commands (in seconds)
+# hook_timeout = 60
+
+# Maximum parallel hook executions
+# max_parallel_hooks = 4
+
+# Enable colored output
+# color_output = true
+
+# Log file path
+# log_file = "./twin.log"
+
+# Log level (debug, info, warn, error)
+# log_level = "info"

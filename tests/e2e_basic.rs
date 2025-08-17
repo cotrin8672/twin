@@ -32,9 +32,9 @@ fn get_twin_binary() -> PathBuf {
 fn setup_git_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
 
-    // Git初期化
+    // Git初期化（デフォルトブランチ名を明示的に指定）
     Command::new("git")
-        .args(["init"])
+        .args(["init", "-b", "main"])
         .current_dir(dir.path())
         .output()
         .expect("git init failed");
