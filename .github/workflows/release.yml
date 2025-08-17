@@ -198,5 +198,7 @@ jobs:
     
     - name: Publish to crates.io
       # Trusted Publishingを使用（初回公開後に設定）
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       run: |
         cargo publish --no-verify
