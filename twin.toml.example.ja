@@ -1,0 +1,258 @@
+# twin.toml.example - Twin設定ファイルテンプレート（日本語版）
+# このファイルをtwin.tomlとしてコピーして使用してください
+
+# ====================
+# 基本設定
+# ====================
+
+# ワークツリーを作成するベースディレクトリ
+# デフォルト: "./worktrees"
+# 相対パスまたは絶対パスを指定可能
+# 'twin add'コマンドでパスを指定しない場合に使用されます
+worktree_base = "./worktrees"
+
+# Gitブランチ名のプレフィックス（オプション）
+# デフォルト: なし
+# 例: "agent/"プレフィックスを設定すると、agent-001 → agent/agent-001 ブランチが作成される
+# branch_prefix = "agent/"
+
+# 新規ワークツリー作成時のデフォルトブランチ（オプション）
+# 指定しない場合は現在のブランチを使用
+# default_branch = "main"
+
+# ====================
+# ファイルマッピング設定
+# ====================
+# 各環境で共有したいファイルやディレクトリを定義します
+# シンボリックリンク、コピー、テンプレート処理から選択可能
+
+# 例1: 設定ファイルをシンボリックリンクで共有
+[[files]]
+source = ".claude/config.template.json"  # ソースファイルパス
+target = ".claude/config.json"           # ワークツリー内の配置先
+mapping_type = "symlink"                 # マッピング方式（symlink/copy/template）
+skip_if_exists = true                    # 既存ファイルがある場合はスキップ
+description = "Claude AI設定ファイル"
+
+# 例2: 環境変数ファイルをコピー（各環境で個別に編集可能）
+[[files]]
+source = ".env.template"
+target = ".env"
+mapping_type = "copy"                    # コピーして配置
+skip_if_exists = true                    # 既存の.envは上書きしない
+description = "環境変数設定"
+
+# 例3: VSCode設定を共有
+[[files]]
+source = ".vscode/settings.template.json"
+target = ".vscode/settings.json"
+mapping_type = "symlink"
+skip_if_exists = false                   # 常に上書き
+description = "VSCode設定"
+
+# 例4: Gitフックを共有
+[[files]]
+source = "shared/hooks"
+target = ".git/hooks"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "共有Gitフック"
+
+# 例5: npmパッケージ設定
+[[files]]
+source = "package.json"
+target = "package.json"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "npm依存関係"
+
+# 例6: Docker設定
+[[files]]
+source = "docker-compose.template.yml"
+target = "docker-compose.yml"
+mapping_type = "copy"
+skip_if_exists = true
+description = "Docker Compose設定"
+
+# 例7: Kiro仕様書（AI駆動開発用）
+[[files]]
+source = ".kiro"
+target = ".kiro"
+mapping_type = "symlink"
+skip_if_exists = false
+description = "Kiro仕様駆動開発ファイル"
+
+# ====================
+# フック設定
+# ====================
+# 環境の作成・削除時に実行するコマンドを定義
+# {name} は環境名（エージェント名）に置換されます
+# {path} はワークツリーのパスに置換されます
+# {branch} はブランチ名に置換されます
+
+[hooks]
+
+# 環境作成前に実行するコマンド
+pre_create = [
+    # ログ出力
+    { 
+        command = "echo '🚀 ワークツリーを作成中: {name} ({path})'", 
+        continue_on_error = false,
+        description = "作成メッセージを表示"
+    },
+    
+    # 必要なディレクトリを作成
+    { 
+        command = "mkdir -p {path}/.cache {path}/tmp", 
+        continue_on_error = true,
+        description = "キャッシュディレクトリを作成"
+    }
+]
+
+# 環境作成後に実行するコマンド
+post_create = [
+    # 成功メッセージ
+    { 
+        command = "echo '✅ ワークツリー {name} を {path} に作成しました'", 
+        continue_on_error = false,
+        description = "成功メッセージを表示"
+    },
+    
+    # 依存関係をインストール（package.jsonが存在する場合）
+    { 
+        command = "cd {path} && [ -f package.json ] && npm install || true", 
+        continue_on_error = true,
+        timeout = 300,  # 5分のタイムアウト
+        description = "npm依存関係をインストール"
+    },
+    
+    # ワークツリー用のGit設定
+    { 
+        command = "cd {path} && git config user.email 'agent-{name}@example.com'", 
+        continue_on_error = true,
+        description = "ワークツリー用のGitユーザーメールを設定"
+    },
+    
+    # VS Codeで開く（オプション）
+    { 
+        command = "code {path}", 
+        continue_on_error = true,
+        enabled = false,  # デフォルトでは無効
+        description = "VS Codeでワークツリーを開く"
+    },
+    
+    # 初期化スクリプトを実行（存在する場合）
+    { 
+        command = "[ -f ./scripts/setup-environment.sh ] && ./scripts/setup-environment.sh {name} {path} || true", 
+        continue_on_error = true,
+        timeout = 120,
+        description = "環境セットアップスクリプトを実行"
+    }
+]
+
+# 環境削除前に実行するコマンド
+pre_remove = [
+    # 警告メッセージ
+    { 
+        command = "echo '⚠️  ワークツリーを削除中: {name} ({path})'", 
+        continue_on_error = false,
+        description = "削除警告を表示"
+    },
+    
+    # バックアップを作成（オプション）
+    { 
+        command = "[ -d ./backups ] && tar -czf ./backups/{name}-$(date +%Y%m%d-%H%M%S).tar.gz {path}/.env {path}/data 2>/dev/null || true", 
+        continue_on_error = true,
+        enabled = false,  # デフォルトでは無効
+        description = "環境データをバックアップ"
+    },
+    
+    # 実行中のプロセスを停止
+    { 
+        command = "pkill -f '{path}' || true", 
+        continue_on_error = true,
+        enabled = false,  # デフォルトでは無効
+        description = "ワークツリー内のプロセスを終了"
+    }
+]
+
+# 環境削除後に実行するコマンド
+post_remove = [
+    # 完了メッセージ
+    { 
+        command = "echo '🗑️  ワークツリー {name} を {path} から削除しました'", 
+        continue_on_error = false,
+        description = "削除完了を表示"
+    },
+    
+    # キャッシュをクリア
+    { 
+        command = "rm -rf /tmp/cache-{name} 2>/dev/null || true", 
+        continue_on_error = true,
+        description = "一時キャッシュをクリア"
+    }
+]
+
+# ====================
+# 高度な設定（未実装）
+# ====================
+
+# 変数置換を使用したテンプレート処理
+# [[files]]
+# source = "config.template"
+# target = "config.json"
+# mapping_type = "template"
+# variables = { 
+#     api_key = "${API_KEY}",
+#     environment = "{name}",
+#     port = "3000"
+# }
+
+# OSや環境に基づく条件付きマッピング
+# [[files]]
+# source = "windows-config.json"
+# target = ".config/app.json"
+# mapping_type = "copy"
+# condition = "os.platform == 'windows'"
+
+# 環境固有のフック
+# [hooks.environments.production]
+# pre_create = [
+#     { command = "echo '本番環境をセットアップ中'", continue_on_error = false }
+# ]
+
+# 特定機能用のグループ化されたフック
+# [hooks.groups.database]
+# pre_create = [
+#     { command = "docker-compose up -d postgres", continue_on_error = false },
+#     { command = "npm run db:migrate", continue_on_error = false }
+# ]
+
+# ====================
+# 設定構造（オプション）
+# ====================
+
+[settings]
+# ワークツリーのベースディレクトリ（上記のworktree_baseと同じ）
+worktree_base = "./worktrees"
+
+# 詳細出力を有効化
+# verbose = true
+
+# ドライランモード（コマンドを実行せず、実行内容のみ表示）
+# dry_run = false
+
+# フックコマンドのデフォルトタイムアウト（秒）
+# hook_timeout = 60
+
+# 最大並列フック実行数
+# max_parallel_hooks = 4
+
+# カラー出力を有効化
+# color_output = true
+
+# ログファイルパス
+# log_file = "./twin.log"
+
+# ログレベル（debug, info, warn, error）
+# log_level = "info"
